@@ -55,6 +55,7 @@ def get_epic_and_children(group_path, epic_iid):
         title
         timeEstimate
         totalTimeSpent
+        createdAt
         labels{
                 nodes{
                 title
@@ -94,6 +95,7 @@ def accumulateEpicTree(group_path, epic_iid, parent_iid=None):
         i = Issue(issue['title'],issue['iid'])
         i.hoursEstimate = (issue['timeEstimate'] or 0)/ 3600.
         i.hoursSpent = (issue['totalTimeSpent'] or 0)/ 3600.
+        i.createdAt = issue['createdAt']  # Store createdAt
         for log in issue['timelogs']['nodes']:
             # Use name (full name) instead of username
             user_name = log['user']['name'] or log['user']['username']
@@ -131,6 +133,7 @@ def build_rows_from_epic(e):
     if e.type=="issue":
         row.update(e.getUserPercentagesByTime())
         row.update([(l,e.hasLabel(l)) for l in labels])
+        row["createdAt"] = getattr(e, 'createdAt', None)  # Add createdAt to row
     csv_rows.append(row)
     for child in e.children:
         build_rows_from_epic(child)

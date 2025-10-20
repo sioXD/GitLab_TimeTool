@@ -301,6 +301,7 @@
         const stats = response.stats || {};
         groupPath = response.group_path || '';
         repositoryName = response.repository_name || '';
+        console.debug("DATA: ", data);
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';

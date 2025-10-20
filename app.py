@@ -69,12 +69,15 @@ def load_data():
             # Add labels
             for label in labels:
                 row[label] = e.hasLabel(label)
+            # Add createdAt
+            row["createdAt"] = getattr(e, 'createdAt', None)
         else:
             # For epics, set user and label columns to None or 0
             for user in users:
                 row[user] = 0
             for label in labels:
                 row[label] = False
+            row["createdAt"] = None
         csv_rows.append(row)
         for child in e.children:
             build_rows(child)
@@ -238,6 +241,9 @@ def get_data():
                 'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
             }
         
+        # Calculate creation statistics
+        creation_stats = calculate_creation_stats(issues, days)
+        
         # Get repository name from GROUP_FULL_PATH (e.g., "group/repo")
         group_full_path = os.getenv("GROUP_FULL_PATH", "")
         repository_name = os.getenv("REPOSITORY_NAME", "")
@@ -253,7 +259,8 @@ def get_data():
                 "total_spent": round(total_spent, 2),
                 "total_estimated": round(total_estimated, 2),
                 "user_stats": user_stats,
-                "label_stats": label_stats
+                "label_stats": label_stats,
+                "creation_stats": creation_stats
             }
         })
     except Exception as e:
@@ -263,6 +270,78 @@ def get_data():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+def calculate_creation_stats(issues, days=None):
+    """Calculate issue creation statistics by time period"""
+    from collections import defaultdict
+    
+    if days is None:
+        cutoff_date = None
+    else:
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
+    
+    # Group issues by week and creator
+    weekly_stats = defaultdict(lambda: defaultdict(int))
+    
+    for issue in issues:
+        created_at = issue.get('createdAt')
+        if not created_at:
+            continue
+        
+        try:
+            # Parse createdAt date
+            if created_at.endswith('Z'):
+                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif '+' in created_at or created_at.count('-') > 2:
+                created_date = datetime.fromisoformat(created_at)
+            else:
+                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            
+            # Apply date filter
+            if cutoff_date is not None:
+                if created_date.tzinfo is None:
+                    created_date = created_date.replace(tzinfo=cutoff_date.tzinfo)
+                if created_date < cutoff_date:
+                    continue
+            
+            # Get week start (Monday)
+            week_start = created_date - timedelta(days=created_date.weekday())
+            week_label = week_start.strftime('%Y-%m-%d')
+            
+            # Count issues per user per week
+            # Note: We don't have creator info in the current data structure
+            # We'll use the primary contributor (user with most time) as proxy
+            max_user = None
+            max_percentage = 0
+            for user in users:
+                percentage = issue.get(user, 0)
+                if percentage > max_percentage:
+                    max_percentage = percentage
+                    max_user = user
+            
+            if max_user:
+                weekly_stats[week_label][max_user] += 1
+            else:
+                weekly_stats[week_label]['Unbekannt'] += 1
+                
+        except Exception as ex:
+            print(f"Error parsing createdAt for issue {issue.get('Titel', 'Unknown')}: {ex}")
+            continue
+    
+    # Convert to sorted list format
+    sorted_weeks = sorted(weekly_stats.keys())
+    result = {
+        'weeks': sorted_weeks,
+        'user_data': {}
+    }
+    
+    for user in users + ['Unbekannt']:
+        result['user_data'][user] = [weekly_stats[week].get(user, 0) for week in sorted_weeks]
+    
+    # Remove users with no issues created
+    result['user_data'] = {k: v for k, v in result['user_data'].items() if sum(v) > 0}
+    
+    return result
 
 if __name__ == "__main__":
     app.run(debug=True)
