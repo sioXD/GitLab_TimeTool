@@ -16,8 +16,16 @@ users = []
 labels = []
 epic_tree = None
 
-def load_data(force_refresh=False):
-    """Load data from GitLab API and build CSV rows structure"""
+def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
+    """
+    Load data from GitLab API and build CSV rows structure
+    
+    Parameters:
+    - force_refresh: Force reload from GitLab
+    - token: GitLab Personal Access Token (optional, uses ENV if None)
+    - group_path: GitLab group full path (optional, uses ENV if None)
+    - epic_id: Epic Root IID (optional, uses ENV if None)
+    """
     global csv_rows, users, labels, epic_tree
     
     # Always reload if force_refresh is True
@@ -27,32 +35,32 @@ def load_data(force_refresh=False):
         users_set = set()
         labels_set = set()
         
-        GROUP_FULL_PATH = os.getenv("GROUP_FULL_PATH")
-        EPIC_IID = os.getenv("EPIC_ROOT_ID")
+        # Use provided parameters or fall back to environment variables
+        GROUP_FULL_PATH = group_path if group_path is not None else os.getenv("GROUP_FULL_PATH")
+        EPIC_IID = epic_id if epic_id is not None else os.getenv("EPIC_ROOT_ID")
+        TOKEN = token if token is not None else os.getenv("TOKEN")
         
-        # Build epic tree
-        epic_tree = accumulateEpicTree(GROUP_FULL_PATH, EPIC_IID)
+        if not GROUP_FULL_PATH or not EPIC_IID or not TOKEN:
+            raise ValueError("Missing required parameters: TOKEN, GROUP_FULL_PATH, and EPIC_ROOT_ID")
+        
+        # Import users and labels from timetracker module
+        import timetracker
+        # Clear previous data
+        timetracker.users = []
+        timetracker.labels = []
+        timetracker.csv_rows = []
+        
+        # Build epic tree with explicit parameters
+        epic_tree = accumulateEpicTree(
+            group_path=GROUP_FULL_PATH,
+            epic_iid=EPIC_IID,
+            token=TOKEN
+        )
         epic_tree.accumulateTimes()
         
-        # Collect users and labels from all issues
-        def collect_users_labels(item):
-            if item.type == "issue":
-                try:
-                    for user in item.userTimeMap.keys():
-                        users_set.add(user)
-                except:
-                    pass
-                try:
-                    for label in item.labels:
-                        labels_set.add(label)
-                except:
-                    pass
-            for child in item.children:
-                collect_users_labels(child)
-        
-        collect_users_labels(epic_tree)
-        users = sorted(list(users_set))
-        labels = sorted(list(labels_set))
+        # Get users and labels from timetracker module
+        users = sorted(list(set(timetracker.users)))
+        labels = sorted(list(set(timetracker.labels)))
         
         # Build rows
         def build_rows(e):
@@ -162,7 +170,8 @@ def filter_data_by_date(days=None):
                 "IID": e.id,
                 "Parent IID": parentId,
                 "Zeitaufwand (h)": round(filtered_hours_spent, 2),
-                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2)
+                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
+                "createdAt": getattr(e, 'createdAt', None)
             }
             
             for user in users:
@@ -177,7 +186,8 @@ def filter_data_by_date(days=None):
                 "IID": e.id,
                 "Parent IID": parentId,
                 "Zeitaufwand (h)": 0,
-                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2)
+                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
+                "createdAt": None
             }
             for user in users:
                 row[user] = 0
@@ -221,13 +231,36 @@ def get_data():
         days = request.args.get('days', None)
         days = int(days) if days else None
         refresh = request.args.get('refresh', 'false').lower() == 'true'
+        mode = request.args.get('mode', 'env')
         
-        # Only fetch fresh data if explicitly requested via refresh parameter
-        if refresh:
-            load_data(force_refresh=True)
-        elif epic_tree is None:
-            # Load data for the first time
-            load_data(force_refresh=False)
+        # Get config based on mode
+        if mode == 'local':
+            token = request.args.get('token')
+            group_full_path = request.args.get('group_path')
+            epic_iid = request.args.get('epic_id')
+            repository_name = request.args.get('repo_name', '')
+            
+            if not token or not group_full_path or not epic_iid:
+                raise Exception('Missing required parameters for local mode')
+            
+            # Load data with local parameters
+            load_data(
+                force_refresh=True,
+                token=token,
+                group_path=group_full_path,
+                epic_id=epic_iid
+            )
+        else:
+            # ENV mode
+            group_full_path = os.getenv("GROUP_FULL_PATH", "")
+            repository_name = os.getenv("REPOSITORY_NAME", "")
+            
+            # Only fetch fresh data if explicitly requested via refresh parameter
+            if refresh:
+                load_data(force_refresh=True)
+            elif epic_tree is None:
+                # Load data for the first time
+                load_data(force_refresh=False)
         
         if days:
             data = filter_data_by_date(days)
@@ -255,17 +288,21 @@ def get_data():
         # Calculate creation statistics
         creation_stats = calculate_creation_stats(issues, days)
         
-        # Get repository name from GROUP_FULL_PATH (e.g., "group/repo")
-        group_full_path = os.getenv("GROUP_FULL_PATH", "")
-        repository_name = os.getenv("REPOSITORY_NAME", "")
+        # For local mode, use the provided group_path, otherwise from ENV
+        if mode == 'local':
+            response_group_path = group_full_path
+            response_repo_name = repository_name
+        else:
+            response_group_path = os.getenv("GROUP_FULL_PATH", "")
+            response_repo_name = os.getenv("REPOSITORY_NAME", "")
         
         return jsonify({
             "success": True,
             "data": data,
             "users": users,
             "labels": labels,
-            "group_path": group_full_path,
-            "repository_name": repository_name,
+            "group_path": response_group_path,
+            "repository_name": response_repo_name,
             "stats": {
                 "total_spent": round(total_spent, 2),
                 "total_estimated": round(total_estimated, 2),

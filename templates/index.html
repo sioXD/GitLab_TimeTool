@@ -25,15 +25,112 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 30px;
+      gap: 20px;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .mode-switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: white;
+      padding: 8px 15px;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .mode-switch label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4CAF50;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .mode-label {
+      font-size: 13px;
+      font-weight: bold;
+      min-width: 40px;
+    }
+    .mode-label.active {
+      color: #4CAF50;
+    }
+    .edit-config-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      display: none;
+      margin-left: 5px;
+      color: #666;
+      transition: all 0.3s;
+    }
+    .edit-config-btn:hover {
+      color: #4CAF50;
+      transform: scale(1.1);
+    }
+    .edit-config-btn.visible {
+      display: inline-block;
     }
     .reload-btn {
+      padding: 10px 15px;
+      background: white;
+      border: 2px solid #4CAF50;
+      border-radius: 6px;
       cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .reload-btn:hover {
+      background: #4CAF50;
+      color: white;
     }
     .reload-btn:active {
       transform: translateY(0);
     }
     .reload-btn.loading {
       cursor: not-allowed;
+      opacity: 0.6;
     }
     .reload-icon {
       font-size: 18px;
@@ -46,6 +143,78 @@
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: white;
+      margin: 10% auto;
+      padding: 30px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .modal-content h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 25px;
+    }
+    .modal-buttons button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #45a049;
+    }
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #d0d0d0;
     }
     .filter-bar {
       background: white;
@@ -253,14 +422,29 @@
   <div class="container">
     <div class="header-section">
       <h1>⏱️ GitLab Time Tracking Dashboard</h1>
-      <button id="reloadBtn" class="reload-btn" onclick="reloadData()">
-        <span class="reload-icon">
+      <div class="header-controls">
+        <div class="mode-switch">
+          <span class="mode-label" id="envLabel">ENV</span>
+          <label class="switch">
+            <input type="checkbox" id="modeSwitch" onchange="toggleMode()">
+            <span class="slider"></span>
+          </label>
+          <span class="mode-label" id="localLabel">LOCAL</span>
+          <button class="edit-config-btn" id="editConfigBtn" onclick="showConfigModal()" title="Konfiguration bearbeiten">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+            </svg>
+          </button>
+        </div>
+        <button id="reloadBtn" class="reload-btn" onclick="reloadData()">
+          <span class="reload-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
-        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
-        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
-        </svg>
-        </span>
-      </button>
+              <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+            </svg>
+          </span>
+        </button>
+      </div>
     </div>
 
     <div class="filter-bar">
@@ -297,11 +481,7 @@
           <h3>📈 Fortschritt (Spent vs. Estimated)</h3>
           <canvas id="progressChart"></canvas>
         </div>
-        
-        <div class="chart-container">
-          <h3>📅 Neu erstellte Issues nach Woche</h3>
-          <canvas id="creationChart"></canvas>
-        </div>
+
       </div>
       
       <div class="section">
@@ -316,6 +496,33 @@
     </div>
   </div>
 
+  <!-- Config Modal -->
+  <div id="configModal" class="modal">
+    <div class="modal-content">
+      <h2>🔧 GitLab Konfiguration</h2>
+      <div class="form-group">
+        <label for="gitlabToken">GitLab Personal Access Token:</label>
+        <input type="password" id="gitlabToken" placeholder="glpat-xxxxxxxxxxxx">
+      </div>
+      <div class="form-group">
+        <label for="groupPath">Group Full Path:</label>
+        <input type="text" id="groupPath" placeholder="my-org/my-team">
+      </div>
+      <div class="form-group">
+        <label for="epicId">Epic Root IID:</label>
+        <input type="text" id="epicId" placeholder="123">
+      </div>
+      <div class="form-group">
+        <label for="repoName">Repository Name (optional):</label>
+        <input type="text" id="repoName" placeholder="my-repo">
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-secondary" onclick="closeConfigModal()">Abbrechen</button>
+        <button class="btn-primary" onclick="saveConfig()">Speichern</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentFilter = null;
     let charts = {};
@@ -323,6 +530,122 @@
     let groupPath = '';
     let repositoryName = '';
     let isLoading = false;
+    let currentMode = 'env'; // 'env' or 'local'
+
+    // Initialize mode from localStorage
+    function initMode() {
+      const savedMode = localStorage.getItem('gitlab_mode') || 'env';
+      currentMode = savedMode;
+      const modeSwitch = document.getElementById('modeSwitch');
+      modeSwitch.checked = (savedMode === 'local');
+      updateModeLabels();
+      
+      // Check if local config exists when in local mode
+      if (currentMode === 'local') {
+        const config = getLocalConfig();
+        if (!config.token || !config.groupPath || !config.epicId) {
+          showConfigModal();
+        }
+      }
+    }
+
+    function toggleMode() {
+      const modeSwitch = document.getElementById('modeSwitch');
+      currentMode = modeSwitch.checked ? 'local' : 'env';
+      localStorage.setItem('gitlab_mode', currentMode);
+      updateModeLabels();
+      
+      // Check if local config exists
+      if (currentMode === 'local') {
+        const config = getLocalConfig();
+        if (!config.token || !config.groupPath || !config.epicId) {
+          showConfigModal();
+          return;
+        }
+      }
+      
+      // Reload data with new mode
+      reloadData();
+    }
+
+    function updateModeLabels() {
+      const envLabel = document.getElementById('envLabel');
+      const localLabel = document.getElementById('localLabel');
+      const editBtn = document.getElementById('editConfigBtn');
+      
+      if (currentMode === 'env') {
+        envLabel.classList.add('active');
+        localLabel.classList.remove('active');
+        editBtn.classList.remove('visible');
+      } else {
+        envLabel.classList.remove('active');
+        localLabel.classList.add('active');
+        editBtn.classList.add('visible');
+      }
+    }
+
+    function getLocalConfig() {
+      return {
+        token: localStorage.getItem('gitlab_token') || '',
+        groupPath: localStorage.getItem('gitlab_group_path') || '',
+        epicId: localStorage.getItem('gitlab_epic_id') || '',
+        repoName: localStorage.getItem('gitlab_repo_name') || ''
+      };
+    }
+
+    function showConfigModal() {
+      const modal = document.getElementById('configModal');
+      const config = getLocalConfig();
+      
+      document.getElementById('gitlabToken').value = config.token;
+      document.getElementById('groupPath').value = config.groupPath;
+      document.getElementById('epicId').value = config.epicId;
+      document.getElementById('repoName').value = config.repoName;
+      
+      modal.style.display = 'block';
+    }
+
+    function closeConfigModal() {
+      const modal = document.getElementById('configModal');
+      modal.style.display = 'none';
+      
+      // If no config and in local mode, switch back to env
+      const config = getLocalConfig();
+      if (currentMode === 'local' && (!config.token || !config.groupPath || !config.epicId)) {
+        currentMode = 'env';
+        document.getElementById('modeSwitch').checked = false;
+        localStorage.setItem('gitlab_mode', 'env');
+        updateModeLabels();
+      }
+    }
+
+    function saveConfig() {
+      const token = document.getElementById('gitlabToken').value.trim();
+      const groupPath = document.getElementById('groupPath').value.trim();
+      const epicId = document.getElementById('epicId').value.trim();
+      const repoName = document.getElementById('repoName').value.trim();
+      
+      if (!token || !groupPath || !epicId) {
+        alert('Bitte füllen Sie alle Pflichtfelder aus!');
+        return;
+      }
+      
+      localStorage.setItem('gitlab_token', token);
+      localStorage.setItem('gitlab_group_path', groupPath);
+      localStorage.setItem('gitlab_epic_id', epicId);
+      localStorage.setItem('gitlab_repo_name', repoName);
+      
+      closeConfigModal();
+      reloadData();
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('configModal');
+      if (event.target == modal) {
+        closeConfigModal();
+      }
+    }
 
     async function loadData(days = null, forceRefresh = false) {
       if (isLoading) {
@@ -345,6 +668,16 @@
         }
         if (forceRefresh) {
           params.push('refresh=true');
+        }
+        if (currentMode === 'local') {
+          const config = getLocalConfig();
+          params.push(`mode=local`);
+          params.push(`token=${encodeURIComponent(config.token)}`);
+          params.push(`group_path=${encodeURIComponent(config.groupPath)}`);
+          params.push(`epic_id=${encodeURIComponent(config.epicId)}`);
+          if (config.repoName) {
+            params.push(`repo_name=${encodeURIComponent(config.repoName)}`);
+          }
         }
         if (params.length > 0) {
           url += '?' + params.join('&');
@@ -376,7 +709,6 @@
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
         createProgressChart(data);
-        createCreationChart(stats.creation_stats);
         
         // Create table
         createTable(data, users, labels);
@@ -385,9 +717,6 @@
         document.getElementById('loading').style.display = 'none';
         const errorDiv = document.getElementById('error');
         errorDiv.innerHTML = '<strong>Fehler:</strong> ' + error.message;
-        if (error.traceback) {
-          errorDiv.innerHTML += '<pre>' + error.traceback + '</pre>';
-        }
         errorDiv.style.display = 'block';
         console.error('Error loading data:', error);
       } finally {
@@ -461,7 +790,7 @@
         const li = document.createElement('li');
         
         // Build GitLab issue URL
-        const issueUrl = `${gitlabUrl}/${groupPath}/${repositoryName}/-/issues/${issue.IID}`;
+        const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${issue.IID}`;
         
         // Get users who worked on this issue (with percentage > 0)
         const workingUsers = [];
@@ -592,7 +921,18 @@
             }
           },
           plugins: {
-            legend: { display: false }
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  // Show full label name in tooltip
+                  return labels[context[0].dataIndex];
+                },
+                label: function(context) {
+                  return context.parsed.x + ' h';
+                }
+              }
+            }
           }
         }
       });
@@ -646,91 +986,7 @@
       });
     }
     
-    function createCreationChart(creationStats) {
-      if (!creationStats || !creationStats.weeks || creationStats.weeks.length === 0) {
-        const ctx = document.getElementById('creationChart');
-        if (!ctx) return;
-        const parent = ctx.parentElement;
-        parent.innerHTML = '<h3>📅 Neu erstellte Issues nach Woche</h3><p style="text-align:center;color:#666;padding:40px;">Keine Daten verfügbar</p>';
-        return;
-      }
-      
-      const weeks = creationStats.weeks;
-      const userData = creationStats.user_data;
-      
-      // Generate colors for each user
-      const colors = [
-        'rgba(255, 99, 132, 0.7)',
-        'rgba(54, 162, 235, 0.7)',
-        'rgba(255, 206, 86, 0.7)',
-        'rgba(75, 192, 192, 0.7)',
-        'rgba(153, 102, 255, 0.7)',
-        'rgba(255, 159, 64, 0.7)',
-        'rgba(199, 199, 199, 0.7)',
-        'rgba(83, 102, 255, 0.7)',
-        'rgba(220, 20, 60, 0.7)',
-        'rgba(34, 139, 34, 0.7)',
-      ];
-      
-      const datasets = Object.keys(userData).map((user, index) => ({
-        label: user,
-        data: userData[user],
-        backgroundColor: colors[index % colors.length],
-        borderColor: colors[index % colors.length].replace('0.7', '1'),
-        borderWidth: 1
-      }));
-      
-      if (charts.creationChart) charts.creationChart.destroy();
-      const ctx = document.getElementById('creationChart');
-      if (!ctx) return;
-      
-      charts.creationChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: weeks.map(w => {
-            const date = new Date(w);
-            return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-          }),
-          datasets: datasets
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: {
-            x: {
-              stacked: true,
-              title: { display: true, text: 'Woche (Montag)' }
-            },
-            y: {
-              stacked: true,
-              beginAtZero: true,
-              title: { display: true, text: 'Anzahl Issues' },
-              ticks: {
-                stepSize: 1
-              }
-            }
-          },
-          plugins: {
-            legend: { 
-              display: true,
-              position: 'bottom'
-            },
-            tooltip: {
-              callbacks: {
-                title: function(context) {
-                  const weekStart = weeks[context[0].dataIndex];
-                  const date = new Date(weekStart);
-                  return 'Woche ab ' + date.toLocaleDateString('de-DE');
-                },
-                label: function(context) {
-                  return context.dataset.label + ': ' + context.parsed.y + ' Issue(s)';
-                }
-              }
-            }
-          }
-        }
-      });
-    }
+    
 
     function createTable(data, users, labels) {
       const tableHead = document.getElementById('tableHead');
@@ -777,7 +1033,7 @@
         baseColumns.forEach(col => {
           const td = document.createElement('td');
           if (col === 'Titel' && row.Typ === 'issue') {
-            const issueUrl = `${gitlabUrl}/${groupPath}/-/issues/${row.IID}`;
+            const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${row.IID}`;
             td.innerHTML = `<a href="${issueUrl}" target="_blank">${row[col]}</a>`;
           } else {
             td.textContent = row[col] !== undefined ? row[col] : '';
@@ -813,7 +1069,8 @@
       });
     }
 
-    // Load data on page load (initial load with refresh)
+    // Initialize and load data on page load
+    initMode();
     loadData(null, true);
   </script>
 </body>
