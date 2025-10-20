@@ -18,8 +18,9 @@ Erstellen Sie eine `.env` Datei im Projektverzeichnis:
 
 ```env
 TOKEN=ihr_gitlab_personal_access_token
-GROUP_FULL_PATH=ihre-gruppe/ihr-projekt
+GROUP_FULL_PATH=ihre-gruppe/ihre-untergruppe
 EPIC_ROOT_ID=123
+REPOSITORY_NAME=ihr-projekt
 ```
 
 ### Schritt 2: GitLab Personal Access Token erstellen
