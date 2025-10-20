@@ -354,36 +354,292 @@
       color: #1976D2;
       font-weight: 500;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .loading {
+      text-align: center;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 20px;
+      border-radius: 8px;
       margin: 20px 0;
     }
-    th, td {
-      padding: 12px;
+    .section {
+      margin: 30px 0;
+    }
+    h2 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    
+    /* Tree Diagram Styles */
+    .tree-container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 800px;
+    }
+
+    .tree {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 20px;
+    }
+
+    .tree-node {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-node-content {
+      background: white;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-width: 250px;
+      max-width: 500px;
       text-align: left;
-      border-bottom: 1px solid #ddd;
-      font-size: 14px;
     }
-    th {
-      background: #4CAF50;
+
+    .tree-node-content:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      background: #e8f5e9;
+    }
+
+    .tree-node-content.root {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      border-color: #667eea;
+      font-size: 18px;
       font-weight: bold;
-      position: sticky;
-      top: 0;
-      z-index: 10;
     }
-    tr:hover {
-      background: #f5f5f5;
-    }
-    .epic-row {
+
+    .tree-node-content.epic {
       background: #e3f2fd;
+      border-color: #2196F3;
+    }
+
+    .tree-node-content.epic.expanded {
+      background: #bbdefb;
+    }
+
+    .tree-node-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .tree-node-meta {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .tree-node-content.root .tree-node-meta {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .tree-children {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 10px;
+      margin-left: 30px;
+      width: 100%;
+      gap: 10px;
+    }
+
+    .tree-line {
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-line::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: -20px;
+      width: 20px;
+      height: 2px;
+      background: #ccc;
+    }
+    
+    /* Epic Content - versteckt standardmäßig */
+    .epic-content {
+      display: none;
+      margin-top: 20px;
+      margin-left: 30px;
+      width: calc(100% - 30px);
+    }
+
+    .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Child Epics Container - horizontale Row */
+    .child-epics-container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      flex-wrap: wrap;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border-left: 4px solid #2196F3;
+    }
+
+    .child-epics-container.level-1 {
+      background: #e8f4f8;
+      border-left-color: #2196F3;
+    }
+
+    .child-epics-container.level-2 {
+      background: #fff3e0;
+      border-left-color: #FF9800;
+    }
+
+    .child-epics-container.level-3 {
+      background: #f3e5f5;
+      border-left-color: #9C27B0;
+    }
+
+    /* Child Epic - einzelne Karte in der Row */
+    .child-epic {
+      flex: 1 1 300px;
+      min-width: 280px;
+      max-width: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .child-epic .tree-node-content {
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Nested Epic Content - wieder vertikal */
+    .child-epic .epic-content {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .child-epic .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 15px;
+      padding-left: 15px;
+      border-left: 2px solid #e0e0e0;
+    }
+
+    /* Issue List Wrapper - vertikal unter Epic */
+    .issue-list-wrapper {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-left: 3px solid #4CAF50;
+    }
+
+    /* Issue Item Styles */
+    .issue-item {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #4CAF50;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+    }
+
+    .issue-item:hover {
+      transform: translateX(3px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .issue-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .issue-item-title {
+      font-weight: bold;
+      color: #2196F3;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .issue-item-title:hover {
+      text-decoration: underline;
+    }
+
+    .issue-item-stats {
+      display: flex;
+      gap: 15px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .issue-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .issue-stat-label {
+      color: #666;
+    }
+
+    .issue-stat-value {
       font-weight: bold;
     }
-    .issue-row {
-      padding-left: 20px;
+
+    .issue-stat-value.hours-spent {
+      color: #4CAF50;
+    }
+
+    .issue-stat-value.hours-estimated {
+      color: #FF9800;
+    }
+
+    .issue-stat-value.created {
+      color: #9E9E9E;
+    }
+
+    .issue-contributors {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .contributor-badge {
+      padding: 4px 10px;
+      background: #E3F2FD;
+      border: 1px solid #2196F3;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #1976D2;
+      font-weight: 500;
     }
     .loading {
       text-align: center;
@@ -395,12 +651,292 @@
       border-radius: 8px;
       margin: 20px 0;
     }
-    .label-true {
-      color: #4CAF50;
+    .section {
+      margin: 30px 0;
+    }
+    h2 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    
+    /* Tree Diagram Styles */
+    .tree-container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 800px;
+    }
+
+    .tree {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 20px;
+    }
+
+    .tree-node {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-node-content {
+      background: white;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-width: 250px;
+      max-width: 500px;
+      text-align: left;
+    }
+
+    .tree-node-content:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      background: #e8f5e9;
+    }
+
+    .tree-node-content.root {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+      font-size: 18px;
       font-weight: bold;
     }
-    .label-false {
-      color: #ccc;
+
+    .tree-node-content.epic {
+      background: #e3f2fd;
+      border-color: #2196F3;
+    }
+
+    .tree-node-content.epic.expanded {
+      background: #bbdefb;
+    }
+
+    .tree-node-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .tree-node-meta {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .tree-node-content.root .tree-node-meta {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .tree-children {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 10px;
+      margin-left: 30px;
+      width: 100%;
+      gap: 10px;
+    }
+
+    .tree-line {
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-line::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: -20px;
+      width: 20px;
+      height: 2px;
+      background: #ccc;
+    }
+    
+    /* Epic Content - versteckt standardmäßig */
+    .epic-content {
+      display: none;
+      margin-top: 20px;
+      margin-left: 30px;
+      width: calc(100% - 30px);
+    }
+
+    .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Child Epics Container - horizontale Row */
+    .child-epics-container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      flex-wrap: wrap;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border-left: 4px solid #2196F3;
+    }
+
+    .child-epics-container.level-1 {
+      background: #e8f4f8;
+      border-left-color: #2196F3;
+    }
+
+    .child-epics-container.level-2 {
+      background: #fff3e0;
+      border-left-color: #FF9800;
+    }
+
+    .child-epics-container.level-3 {
+      background: #f3e5f5;
+      border-left-color: #9C27B0;
+    }
+
+    /* Child Epic - einzelne Karte in der Row */
+    .child-epic {
+      flex: 1 1 300px;
+      min-width: 280px;
+      max-width: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .child-epic .tree-node-content {
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Nested Epic Content - wieder vertikal */
+    .child-epic .epic-content {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .child-epic .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 15px;
+      padding-left: 15px;
+      border-left: 2px solid #e0e0e0;
+    }
+
+    /* Issue List Wrapper - vertikal unter Epic */
+    .issue-list-wrapper {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-left: 3px solid #4CAF50;
+    }
+
+    /* Issue Item Styles */
+    .issue-item {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #4CAF50;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+    }
+
+    .issue-item:hover {
+      transform: translateX(3px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .issue-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .issue-item-title {
+      font-weight: bold;
+      color: #2196F3;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .issue-item-title:hover {
+      text-decoration: underline;
+    }
+
+    .issue-item-stats {
+      display: flex;
+      gap: 15px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .issue-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .issue-stat-label {
+      color: #666;
+    }
+
+    .issue-stat-value {
+      font-weight: bold;
+    }
+
+    .issue-stat-value.hours-spent {
+      color: #4CAF50;
+    }
+
+    .issue-stat-value.hours-estimated {
+      color: #FF9800;
+    }
+
+    .issue-stat-value.created {
+      color: #9E9E9E;
+    }
+
+    .issue-contributors {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .contributor-badge {
+      padding: 4px 10px;
+      background: #E3F2FD;
+      border: 1px solid #2196F3;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #1976D2;
+      font-weight: 500;
+    }
+    .loading {
+      text-align: center;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
     }
     .section {
       margin: 30px 0;
@@ -411,10 +947,273 @@
       padding-bottom: 10px;
       margin-bottom: 20px;
     }
-    .table-wrapper {
+    
+    /* Tree Diagram Styles */
+    .tree-container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       overflow-x: auto;
-      max-height: 600px;
       overflow-y: auto;
+      max-height: 800px;
+    }
+
+    .tree {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 20px;
+    }
+
+    .tree-node {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-node-content {
+      background: white;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      min-width: 250px;
+      max-width: 500px;
+      text-align: left;
+    }
+
+    .tree-node-content:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      background: #e8f5e9;
+    }
+
+    .tree-node-content.root {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .tree-node-content.epic {
+      background: #e3f2fd;
+      border-color: #2196F3;
+    }
+
+    .tree-node-content.epic.expanded {
+      background: #bbdefb;
+    }
+
+    .tree-node-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .tree-node-meta {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .tree-node-content.root .tree-node-meta {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .tree-children {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 10px;
+      margin-left: 30px;
+      width: 100%;
+      gap: 10px;
+    }
+
+    .tree-line {
+      position: relative;
+      width: 100%;
+    }
+
+    .tree-line::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: -20px;
+      width: 20px;
+      height: 2px;
+      background: #ccc;
+    }
+    
+    /* Epic Content - versteckt standardmäßig */
+    .epic-content {
+      display: none;
+      margin-top: 20px;
+      margin-left: 30px;
+      width: calc(100% - 30px);
+    }
+
+    .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Child Epics Container - horizontale Row */
+    .child-epics-container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      flex-wrap: wrap;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border-left: 4px solid #2196F3;
+    }
+
+    .child-epics-container.level-1 {
+      background: #e8f4f8;
+      border-left-color: #2196F3;
+    }
+
+    .child-epics-container.level-2 {
+      background: #fff3e0;
+      border-left-color: #FF9800;
+    }
+
+    .child-epics-container.level-3 {
+      background: #f3e5f5;
+      border-left-color: #9C27B0;
+    }
+
+    /* Child Epic - einzelne Karte in der Row */
+    .child-epic {
+      flex: 1 1 300px;
+      min-width: 280px;
+      max-width: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .child-epic .tree-node-content {
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Nested Epic Content - wieder vertikal */
+    .child-epic .epic-content {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .child-epic .epic-content.show {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 15px;
+      padding-left: 15px;
+      border-left: 2px solid #e0e0e0;
+    }
+
+    /* Issue List Wrapper - vertikal unter Epic */
+    .issue-list-wrapper {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-left: 3px solid #4CAF50;
+    }
+
+    /* Issue Item Styles */
+    .issue-item {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #4CAF50;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.3s;
+    }
+
+    .issue-item:hover {
+      transform: translateX(3px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .issue-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .issue-item-title {
+      font-weight: bold;
+      color: #2196F3;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .issue-item-title:hover {
+      text-decoration: underline;
+    }
+
+    .issue-item-stats {
+      display: flex;
+      gap: 15px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .issue-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .issue-stat-label {
+      color: #666;
+    }
+
+    .issue-stat-value {
+      font-weight: bold;
+    }
+
+    .issue-stat-value.hours-spent {
+      color: #4CAF50;
+    }
+
+    .issue-stat-value.hours-estimated {
+      color: #FF9800;
+    }
+
+    .issue-stat-value.created {
+      color: #9E9E9E;
+    }
+
+    .issue-contributors {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .contributor-badge {
+      padding: 4px 10px;
+      background: #E3F2FD;
+      border: 1px solid #2196F3;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #1976D2;
+      font-weight: 500;
     }
   </style>
 </head>
@@ -455,7 +1254,7 @@
       <button onclick="filterByDays(30)" class="filter-btn" data-days="30">Letzte 30 Tage</button>
     </div>
 
-    <div id="loading" class="loading">Daten werden geladen</div>
+    <div id="loading" class="loading">Daten werden geladen...</div>
     <div id="error" class="error" style="display:none;"></div>
     
     <div id="content" style="display:none;">
@@ -481,17 +1280,11 @@
           <h3>📈 Fortschritt (Spent vs. Estimated)</h3>
           <canvas id="progressChart"></canvas>
         </div>
-
       </div>
       
       <div class="section">
-        <h2>📋 Detaillierte Daten</h2>
-        <div class="table-wrapper">
-          <table id="dataTable">
-            <thead id="tableHead"></thead>
-            <tbody id="tableBody"></tbody>
-          </table>
-        </div>
+        <h2>🌳 Projekt Struktur</h2>
+        <div class="tree-container" id="treeContainer"></div>
       </div>
     </div>
   </div>
@@ -530,7 +1323,9 @@
     let groupPath = '';
     let repositoryName = '';
     let isLoading = false;
-    let currentMode = 'env'; // 'env' or 'local'
+    let currentMode = 'env';
+    let treeData = null;
+    let allUsers = [];
 
     // Initialize mode from localStorage
     function initMode() {
@@ -540,7 +1335,6 @@
       modeSwitch.checked = (savedMode === 'local');
       updateModeLabels();
       
-      // Check if local config exists when in local mode
       if (currentMode === 'local') {
         const config = getLocalConfig();
         if (!config.token || !config.groupPath || !config.epicId) {
@@ -555,7 +1349,6 @@
       localStorage.setItem('gitlab_mode', currentMode);
       updateModeLabels();
       
-      // Check if local config exists
       if (currentMode === 'local') {
         const config = getLocalConfig();
         if (!config.token || !config.groupPath || !config.epicId) {
@@ -564,7 +1357,6 @@
         }
       }
       
-      // Reload data with new mode
       reloadData();
     }
 
@@ -609,7 +1401,6 @@
       const modal = document.getElementById('configModal');
       modal.style.display = 'none';
       
-      // If no config and in local mode, switch back to env
       const config = getLocalConfig();
       if (currentMode === 'local' && (!config.token || !config.groupPath || !config.epicId)) {
         currentMode = 'env';
@@ -639,7 +1430,6 @@
       reloadData();
     }
 
-    // Close modal when clicking outside
     window.onclick = function(event) {
       const modal = document.getElementById('configModal');
       if (event.target == modal) {
@@ -696,22 +1486,17 @@
         const stats = response.stats || {};
         groupPath = response.group_path || '';
         repositoryName = response.repository_name || '';
-        console.debug("DATA: ", data);
+        allUsers = users;
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
         
-        // Create statistics cards
         createStatsCards(stats);
-        
-        // Create charts and lists
         createTopIssuesList(data);
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
         createProgressChart(data);
-        
-        // Create table
-        createTable(data, users, labels);
+        createTreeDiagram(data, users);
         
       } catch (error) {
         document.getElementById('loading').style.display = 'none';
@@ -741,19 +1526,18 @@
       if (isLoading) return;
       
       console.log('🔄 Reloading data from GitLab...');
-      loadData(currentFilter, true);  // forceRefresh = true
+      loadData(currentFilter, true);
     }
     
     function filterByDays(days) {
       currentFilter = days;
       
-      // Update active button
       document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
       });
       event.target.classList.add('active');
       
-      loadData(days, false);  // forceRefresh = false
+      loadData(days, false);
     }
 
     function createStatsCards(stats) {
@@ -777,10 +1561,8 @@
     function createTopIssuesList(data) {
       const issues = data.filter(d => d.Typ === 'issue' && d['Zeitaufwand (h)'] > 0);
       
-      // Sort by time spent descending
       issues.sort((a, b) => b['Zeitaufwand (h)'] - a['Zeitaufwand (h)']);
       
-      // Take top 10
       const topIssues = issues.slice(0, 10);
       
       const list = document.getElementById('topIssuesList');
@@ -789,13 +1571,10 @@
       topIssues.forEach((issue, index) => {
         const li = document.createElement('li');
         
-        // Build GitLab issue URL
         const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${issue.IID}`;
         
-        // Get users who worked on this issue (with percentage > 0)
         const workingUsers = [];
         for (const key in issue) {
-          // Check if it's a user column (not a standard column and has a percentage value)
           if (!['Typ', 'Titel', 'IID', 'Parent IID', 'Zeitaufwand (h)', 'gesch. Zeitaufwand (h)', 'createdAt'].includes(key) 
               && typeof issue[key] === 'number' 
               && issue[key] > 0) {
@@ -806,10 +1585,8 @@
           }
         }
         
-        // Sort by percentage descending
         workingUsers.sort((a, b) => b.percentage - a.percentage);
         
-        // Create user badges HTML
         const userBadgesHtml = workingUsers.length > 0 
           ? `<div class="user-badges">
                ${workingUsers.map(u => `<span class="user-badge">${u.name.replace(/ .*/,'')} (${(u.percentage * 100).toFixed(0)}%)</span>`).join('')}
@@ -878,10 +1655,8 @@
       const labels = Object.keys(labelStats).filter(l => labelStats[l].hours > 0);
       const hours = labels.map(l => labelStats[l].hours);
       
-      // Extract first word from label names
       const shortLabels = labels.map(l => l.split(' ')[0]);
       
-      // Use same colors as user chart
       const colors = [
         'rgba(255, 99, 132, 0.7)',
         'rgba(54, 162, 235, 0.7)',
@@ -925,7 +1700,6 @@
             tooltip: {
               callbacks: {
                 title: function(context) {
-                  // Show full label name in tooltip
                   return labels[context[0].dataIndex];
                 },
                 label: function(context) {
@@ -986,89 +1760,209 @@
       });
     }
     
+    function createTreeDiagram(data, users) {
+      const container = document.getElementById('treeContainer');
+      
+      // Build tree structure
+      const root = data.find(d => d.Typ === 'epic' && d['Parent IID'] === null);
+      if (!root) {
+        container.innerHTML = '<p>Keine Root-Epic gefunden</p>';
+        return;
+      }
+      
+      // Filter nur Top-Level Epics (direkt unter Root)
+      const topLevelEpics = data.filter(d => d.Typ === 'epic' && d['Parent IID'] === root.IID);
+      const allEpics = data.filter(d => d.Typ === 'epic' && d.IID !== root.IID);
+      const issues = data.filter(d => d.Typ === 'issue');
+      
+      // Helper function to get direct child epics
+      function getChildEpics(parentIid) {
+        return allEpics.filter(e => e['Parent IID'] === parentIid);
+      }
+      
+      // Helper function to get direct issues under an epic
+      function getDirectIssues(epicIid) {
+        return issues.filter(i => i['Parent IID'] === epicIid);
+      }
+      
+      // Helper function to get all issues recursively
+      function getAllIssuesForEpic(epicIid) {
+        const directIssues = getDirectIssues(epicIid);
+        const childEpics = getChildEpics(epicIid);
+        const childIssues = childEpics.flatMap(childEpic => getAllIssuesForEpic(childEpic.IID));
+        return [...directIssues, ...childIssues];
+      }
+      
+      // Helper function to count child epics recursively
+      function countChildEpics(epicIid) {
+        const directChildren = getChildEpics(epicIid);
+        let count = directChildren.length;
+        directChildren.forEach(child => {
+          count += countChildEpics(child.IID);
+        });
+        return count;
+      }
+      
+      // Helper function to render an issue
+      function renderIssue(issue) {
+        const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${issue.IID}`;
+        const createdDate = issue.createdAt ? new Date(issue.createdAt).toLocaleDateString('de-DE') : 'N/A';
+        
+        const contributors = [];
+        allUsers.forEach(user => {
+          const percentage = issue[user];
+          if (percentage > 0) {
+            contributors.push({
+              name: user,
+              percentage: percentage
+            });
+          }
+        });
+        contributors.sort((a, b) => b.percentage - a.percentage);
+        
+        return `<div class="issue-item">
+                  <div class="issue-item-header">
+                    <div class="issue-item-title" onclick="window.open('${issueUrl}', '_blank')">
+                      #${issue.IID} ${issue.Titel}
+                    </div>
+                  </div>
+                  <div class="issue-item-stats">
+                    <div class="issue-stat">
+                      <span class="issue-stat-label">📅 Erstellt:</span>
+                      <span class="issue-stat-value created">${createdDate}</span>
+                    </div>
+                    <div class="issue-stat">
+                      <span class="issue-stat-label">⏱️ Verbracht:</span>
+                      <span class="issue-stat-value hours-spent">${issue['Zeitaufwand (h)']} h</span>
+                    </div>
+                    <div class="issue-stat">
+                      <span class="issue-stat-label">📊 Geplant:</span>
+                      <span class="issue-stat-value hours-estimated">${issue['gesch. Zeitaufwand (h)']} h</span>
+                    </div>
+                  </div>
+                  ${contributors.length > 0 ? `
+                    <div class="issue-contributors">
+                      ${contributors.map(c => 
+                        `<span class="contributor-badge">${c.name.split(' ')[0]} (${(c.percentage * 100).toFixed(0)}%)</span>`
+                      ).join('')}
+                    </div>
+                  ` : ''}
+                </div>`;
+      }
+      
+      // Helper function to render child epics recursively
+      function renderChildEpics(parentIid, level = 1) {
+        const childEpics = getChildEpics(parentIid);
+        if (childEpics.length === 0) return '';
+        
+        let html = `<div class="child-epics-container level-${level}">`;
+        
+        childEpics.forEach(childEpic => {
+          const directIssues = getDirectIssues(childEpic.IID);
+          const subChildEpics = getChildEpics(childEpic.IID);
+          const totalIssues = getAllIssuesForEpic(childEpic.IID);
+          const childEpicCount = countChildEpics(childEpic.IID);
+          
+          html += `<div class="child-epic">
+                     <div class="tree-node-content epic" onclick="toggleEpic(${childEpic.IID})">
+                       <div class="tree-node-title">📁 ${childEpic.Titel}</div>
+                       <div class="tree-node-meta">
+                         ${childEpicCount > 0 ? `${childEpicCount} Child-Epic${childEpicCount > 1 ? 's' : ''} | ` : ''}
+                         ${totalIssues.length} Issue${totalIssues.length !== 1 ? 's' : ''}
+                       </div>
+                       <div class="tree-node-meta">
+                         ${childEpic['Zeitaufwand (h)']} h / ${childEpic['gesch. Zeitaufwand (h)']} h
+                       </div>
+                     </div>
+                     <div class="epic-content" id="epic-${childEpic.IID}">`;
+      
+      // Render sub-child epics if any
+      if (subChildEpics.length > 0) {
+        html += renderChildEpics(childEpic.IID, level + 1);
+      }
+      
+      // Render direct issues
+      if (directIssues.length > 0) {
+        html += `<div class="issue-list-wrapper">`;
+        directIssues.forEach(issue => {
+          html += renderIssue(issue);
+        });
+        html += `</div>`;
+      }
+      
+      html += `</div></div>`;
+    });
     
+    html += `</div>`;
+    return html;
+  }
+  
+  // Create root node
+  const repoName = groupPath.split('/').pop() || 'Repository';
+  let html = '<div class="tree">';
+  html += '<div class="tree-node">';
+  html += `<div class="tree-node-content root">
+              <div class="tree-node-title">📦 ${repoName}</div>
+              <div class="tree-node-meta">${root.Titel}</div>
+              <div class="tree-node-meta">${root['Zeitaufwand (h)']} h / ${root['gesch. Zeitaufwand (h)']} h</div>
+           </div>`;
+  
+  // Add top-level epics only
+  if (topLevelEpics.length > 0) {
+    html += '<div class="tree-children">';
+    topLevelEpics.forEach(epic => {
+      const totalIssues = getAllIssuesForEpic(epic.IID);
+      const directIssues = getDirectIssues(epic.IID);
+      const childEpicCount = countChildEpics(epic.IID);
+      
+      html += '<div class="tree-node tree-line">';
+      html += `<div class="tree-node-content epic" onclick="toggleEpic(${epic.IID})">
+                  <div class="tree-node-title">📁 ${epic.Titel}</div>
+                  <div class="tree-node-meta">
+                    ${childEpicCount > 0 ? `${childEpicCount} Child-Epic${childEpicCount > 1 ? 's' : ''} | ` : ''}
+                    ${totalIssues.length} Issue${totalIssues.length !== 1 ? 's' : ''}
+                  </div>
+                  <div class="tree-node-meta">
+                    ${epic['Zeitaufwand (h)']} h / ${epic['gesch. Zeitaufwand (h)']} h
+                  </div>
+               </div>`;
+      
+      html += `<div class="epic-content" id="epic-${epic.IID}">`;
+      
+      // Render child epics
+      html += renderChildEpics(epic.IID, 1);
+      
+      // Render direct issues
+      if (directIssues.length > 0) {
+        html += `<div class="issue-list-wrapper">`;
+        directIssues.forEach(issue => {
+          html += renderIssue(issue);
+        });
+        html += `</div>`;
+      }
+      
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  
+  html += '</div></div>';
+  container.innerHTML = html;
+}
 
-    function createTable(data, users, labels) {
-      const tableHead = document.getElementById('tableHead');
-      const tableBody = document.getElementById('tableBody');
-      
-      tableHead.innerHTML = '';
-      tableBody.innerHTML = '';
-      
-      // Create header
-      const headerRow = document.createElement('tr');
-      const baseColumns = ['Typ', 'Titel', 'IID', 'Parent IID', 'Zeitaufwand (h)', 'gesch. Zeitaufwand (h)'];
-      
-      baseColumns.forEach(col => {
-        const th = document.createElement('th');
-        th.textContent = col;
-        headerRow.appendChild(th);
-      });
-      
-      users.forEach(user => {
-        const th = document.createElement('th');
-        th.textContent = user + ' (%)';
-        th.style.background = '#2196F3';
-        headerRow.appendChild(th);
-      });
-      
-      labels.forEach(label => {
-        const th = document.createElement('th');
-        th.textContent = '🏷️ ' + label;
-        th.style.background = '#FF9800';
-        headerRow.appendChild(th);
-      });
-      
-      tableHead.appendChild(headerRow);
-      
-      // Create rows
-      data.forEach(row => {
-        const tr = document.createElement('tr');
-        if (row.Typ === 'epic') {
-          tr.classList.add('epic-row');
-        } else {
-          tr.classList.add('issue-row');
-        }
-        
-        baseColumns.forEach(col => {
-          const td = document.createElement('td');
-          if (col === 'Titel' && row.Typ === 'issue') {
-            const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${row.IID}`;
-            td.innerHTML = `<a href="${issueUrl}" target="_blank">${row[col]}</a>`;
-          } else {
-            td.textContent = row[col] !== undefined ? row[col] : '';
-          }
-          tr.appendChild(td);
-        });
-        
-        users.forEach(user => {
-          const td = document.createElement('td');
-          const value = row[user];
-          if (value !== undefined && value > 0) {
-            td.textContent = (value * 100).toFixed(1) + '%';
-          } else {
-            td.textContent = '-';
-          }
-          tr.appendChild(td);
-        });
-        
-        labels.forEach(label => {
-          const td = document.createElement('td');
-          const hasLabel = row[label];
-          if (hasLabel === true) {
-            td.textContent = '✓';
-            td.classList.add('label-true');
-          } else {
-            td.textContent = '✗';
-            td.classList.add('label-false');
-          }
-          tr.appendChild(td);
-        });
-        
-        tableBody.appendChild(tr);
-      });
-    }
-
+function toggleEpic(epicId) {
+  const epicContent = document.getElementById(`epic-${epicId}`);
+  const epicNode = epicContent.previousElementSibling;
+  
+  if (epicContent.classList.contains('show')) {
+    epicContent.classList.remove('show');
+    epicNode.classList.remove('expanded');
+  } else {
+    epicContent.classList.add('show');
+    epicNode.classList.add('expanded');
+  }
+}
     // Initialize and load data on page load
     initMode();
     loadData(null, true);

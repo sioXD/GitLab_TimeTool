@@ -244,12 +244,18 @@ def get_data():
                 raise Exception('Missing required parameters for local mode')
             
             # Load data with local parameters
-            load_data(
-                force_refresh=True,
+            if refresh:
+                load_data(force_refresh=True,
                 token=token,
                 group_path=group_full_path,
-                epic_id=epic_iid
-            )
+                epic_id=epic_iid)
+            elif epic_tree is None:
+                # Load data for the first time
+                load_data(force_refresh=False,
+                token=token,
+                group_path=group_full_path,
+                epic_id=epic_iid)
+           
         else:
             # ENV mode
             group_full_path = os.getenv("GROUP_FULL_PATH", "")
