@@ -925,6 +925,32 @@
 
     function createStatsCards(stats) {
       const grid = document.getElementById('statsGrid');
+      
+      let progressCard = '';
+      
+      if (currentFilter === null) {
+        // Show progress percentage only for "Alle Daten"
+        progressCard = `
+          <div class="stat-card">
+            <h4>Fortschritt</h4>
+            <div class="value">${stats.total_estimated > 0 ? Math.round((stats.total_spent / stats.total_estimated) * 100) : 0}%</div>
+          </div>
+        `;
+      } else {
+        // Show created issues count for filtered data
+        const createdCount = stats.creation_stats ? 
+          Object.values(stats.creation_stats.user_data).reduce((sum, counts) => 
+            sum + counts.reduce((a, b) => a + b, 0), 0
+          ) : 0;
+        
+        progressCard = `
+          <div class="stat-card">
+            <h4>Erstellte Issues</h4>
+            <div class="value">${createdCount}</div>
+          </div>
+        `;
+      }
+      
       grid.innerHTML = `
         <div class="stat-card">
           <h4>Gesamte aufgewendete Zeit</h4>
@@ -934,10 +960,7 @@
           <h4>Gesamte geschätzte Zeit</h4>
           <div class="value">${stats.total_estimated} h</div>
         </div>
-        <div class="stat-card">
-          <h4>Fortschritt</h4>
-          <div class="value">${stats.total_estimated > 0 ? Math.round((stats.total_spent / stats.total_estimated) * 100) : 0}%</div>
-        </div>
+        ${progressCard}
       `;
     }
     
