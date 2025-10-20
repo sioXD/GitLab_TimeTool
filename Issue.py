@@ -6,6 +6,7 @@ class Issue(Workitem):
     type="issue"
     def __init__(self, title, id):
         super().__init__(title, id)
+        self.userTimeMap = {}
 
     def addTimeSpentByUser(self,time,user,date):
         """UserTimeMap ist ein Diktionary mit einem Eintrag pro User 
@@ -77,7 +78,7 @@ class Issue(Workitem):
             return {}
         
     if __name__ == "__main__":
-        from py.Issue import Issue
+        from Issue import Issue
 
         isu = Issue("Hello",1)
         isu.addLabel("Pronto")

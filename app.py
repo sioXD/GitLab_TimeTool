@@ -83,11 +83,11 @@ def load_data():
     return csv_rows
 
 def filter_data_by_date(days=None):
-    """Filter time data by date range"""
+    """Filter time data by date range using spentAt from timelogs"""
     if days is None:
         cutoff_date = None
     else:
-        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
     
     filtered_rows = []
     
@@ -95,7 +95,7 @@ def filter_data_by_date(days=None):
         parentId = None if (e.parent == None) else e.parent.id
         
         if e.type == "issue":
-            # Filter timelogs by date
+            # Filter timelogs by date using 'Datum' field which contains spentAt
             filtered_hours_spent = 0
             filtered_user_times = {}
             
@@ -103,14 +103,37 @@ def filter_data_by_date(days=None):
                 for user, time_entries in e.userTimeMap.items():
                     user_total = 0
                     for entry in time_entries:
-                        entry_date = datetime.fromisoformat(entry['Datum'].replace('Z', '+00:00'))
-                        if cutoff_date is None or entry_date >= cutoff_date:
+                        # Parse the date from 'Datum' field
+                        date_str = entry['Datum']
+                        # Handle both ISO format with Z and without timezone
+                        if date_str.endswith('Z'):
+                            entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        elif '+' in date_str or date_str.count('-') > 2:
+                            entry_date = datetime.fromisoformat(date_str)
+                        else:
+                            # Assume UTC if no timezone info
+                            entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                        
+                        # Make entry_date timezone-aware if cutoff_date has timezone
+                        if cutoff_date is not None:
+                            if entry_date.tzinfo is None:
+                                entry_date = entry_date.replace(tzinfo=cutoff_date.tzinfo)
+                            
+                            if entry_date >= cutoff_date:
+                                user_total += entry['Zeit(Std)']
+                        else:
                             user_total += entry['Zeit(Std)']
+                    
                     if user_total > 0:
                         filtered_user_times[user] = user_total
                         filtered_hours_spent += user_total
-            except:
-                pass
+            except Exception as ex:
+                print(f"Error filtering dates for issue {e.title}: {ex}")
+                # If filtering fails, include all time
+                for user, time_entries in e.userTimeMap.items():
+                    user_total = sum(entry['Zeit(Std)'] for entry in time_entries)
+                    filtered_user_times[user] = user_total
+                    filtered_hours_spent += user_total
             
             # Calculate percentages
             user_percentages = {}
@@ -154,14 +177,24 @@ def filter_data_by_date(days=None):
         
         filtered_rows.append(row)
         
-        # Process children
+        # Process children first
         for child in e.children:
             build_filtered_rows(child)
         
-        # Sum up children's times for epics
+        # Sum up children's times for epics (from filtered_rows that have been added)
         if e.type == "epic":
             child_rows = [r for r in filtered_rows if r.get("Parent IID") == e.id]
-            row["Zeitaufwand (h)"] = sum(r["Zeitaufwand (h)"] for r in child_rows)
+            total_child_time = sum(r["Zeitaufwand (h)"] for r in child_rows)
+            row["Zeitaufwand (h)"] = round(total_child_time, 2)
+            
+            # Also calculate user percentages for epics based on children
+            if total_child_time > 0:
+                for user in users:
+                    user_time_in_children = sum(
+                        r["Zeitaufwand (h)"] * r.get(user, 0) 
+                        for r in child_rows
+                    )
+                    row[user] = round(user_time_in_children / total_child_time if total_child_time > 0 else 0, 4)
     
     if epic_tree:
         build_filtered_rows(epic_tree)
