@@ -66,6 +66,7 @@ def get_epic_and_children(group_path, epic_iid):
                 spentAt
                 user {
                 username
+                name
                 }
             }
         }
@@ -94,9 +95,11 @@ def accumulateEpicTree(group_path, epic_iid, parent_iid=None):
         i.hoursEstimate = (issue['timeEstimate'] or 0)/ 3600.
         i.hoursSpent = (issue['totalTimeSpent'] or 0)/ 3600.
         for log in issue['timelogs']['nodes']:
-            i.addTimeSpentByUser(log['timeSpent']/3600,log['user']['username'],log['spentAt'])
-            if not log['user']['username'] in users:
-                users.append(log['user']['username'])
+            # Use name (full name) instead of username
+            user_name = log['user']['name'] or log['user']['username']
+            i.addTimeSpentByUser(log['timeSpent']/3600, user_name, log['spentAt'])
+            if not user_name in users:
+                users.append(user_name)
         for lab in issue['labels']['nodes']:
             i.addLabel(lab['title'])
             if not lab['title'] in labels:

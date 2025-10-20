@@ -238,11 +238,17 @@ def get_data():
                 'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
             }
         
+        # Get repository name from GROUP_FULL_PATH (e.g., "group/repo")
+        group_full_path = os.getenv("GROUP_FULL_PATH", "")
+        repository_name = os.getenv("REPOSITORY_NAME", "")
+        
         return jsonify({
             "success": True,
             "data": data,
             "users": users,
             "labels": labels,
+            "group_path": group_full_path,
+            "repository_name": repository_name,
             "stats": {
                 "total_spent": round(total_spent, 2),
                 "total_estimated": round(total_estimated, 2),

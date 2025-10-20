@@ -97,6 +97,51 @@
       font-weight: bold;
       color: #4CAF50;
     }
+    .top-issues-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .top-issues-list li {
+      padding: 15px;
+      margin-bottom: 10px;
+      background: #f9f9f9;
+      border-left: 4px solid #4CAF50;
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+    .top-issues-list li:hover {
+      background: #e8f5e9;
+      transform: translateX(5px);
+    }
+    .issue-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .issue-title a {
+      color: #2196F3;
+      text-decoration: none;
+    }
+    .issue-title a:hover {
+      text-decoration: underline;
+    }
+    .issue-meta {
+      display: flex;
+      gap: 15px;
+      font-size: 13px;
+      color: #666;
+    }
+    .issue-hours {
+      font-weight: bold;
+      color: #4CAF50;
+    }
+    .issue-estimate {
+      color: #FF9800;
+    }
+    .issue-iid {
+      color: #9E9E9E;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -193,8 +238,8 @@
       
       <div class="charts-grid">
         <div class="chart-container">
-          <h3>📊 Zeitaufwand vs. Schätzung</h3>
-          <canvas id="timeChart"></canvas>
+          <h3>🔥 Top Issues nach Zeitaufwand</h3>
+          <ul class="top-issues-list" id="topIssuesList"></ul>
         </div>
         
         <div class="chart-container">
@@ -228,6 +273,9 @@
   <script>
     let currentFilter = null;
     let charts = {};
+    let gitlabUrl = 'https://gitlab.com';
+    let groupPath = '';
+    let repositoryName = '';
 
     async function loadData(days = null) {
       try {
@@ -251,6 +299,8 @@
         const users = response.users || [];
         const labels = response.labels || [];
         const stats = response.stats || {};
+        groupPath = response.group_path || '';
+        repositoryName = response.repository_name || '';
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
@@ -258,8 +308,8 @@
         // Create statistics cards
         createStatsCards(stats);
         
-        // Create charts
-        createTimeChart(data);
+        // Create charts and lists
+        createTopIssuesList(data);
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
         createProgressChart(data);
@@ -309,50 +359,36 @@
       `;
     }
     
-    function createTimeChart(data) {
+    function createTopIssuesList(data) {
       const issues = data.filter(d => d.Typ === 'issue' && d['Zeitaufwand (h)'] > 0);
       
-      const chartData = {
-        labels: issues.map(d => d.Titel.substring(0, 30) + (d.Titel.length > 30 ? '...' : '')),
-        datasets: [
-          {
-            label: 'Verbrachte Zeit (h)',
-            data: issues.map(d => d['Zeitaufwand (h)']),
-            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-          },
-          {
-            label: 'Geplante Zeit (h)',
-            data: issues.map(d => d['gesch. Zeitaufwand (h)']),
-            backgroundColor: 'rgba(255, 206, 86, 0.7)',
-            borderColor: 'rgba(255, 206, 86, 1)',
-            borderWidth: 1
-          }
-        ]
-      };
+      // Sort by time spent descending
+      issues.sort((a, b) => b['Zeitaufwand (h)'] - a['Zeitaufwand (h)']);
       
-      if (charts.timeChart) charts.timeChart.destroy();
-      const ctx = document.getElementById('timeChart');
-      charts.timeChart = new Chart(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: {
-            x: { 
-              ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } }
-            },
-            y: { 
-              beginAtZero: true,
-              title: { display: true, text: 'Stunden' }
-            }
-          },
-          plugins: {
-            legend: { display: true, position: 'top' }
-          }
-        }
+      // Take top 10
+      const topIssues = issues.slice(0, 10);
+      
+      const list = document.getElementById('topIssuesList');
+      list.innerHTML = '';
+      
+      topIssues.forEach((issue, index) => {
+        const li = document.createElement('li');
+        
+        // Build GitLab issue URL
+        const issueUrl = `${gitlabUrl}/${groupPath}/${repositoryName}/-/issues/${issue.IID}`;
+        
+        li.innerHTML = `
+          <div class="issue-title">
+            ${index + 1}. <a href="${issueUrl}" target="_blank">#${issue.IID} ${issue.Titel}</a>
+          </div>
+          <div class="issue-meta">
+            <span class="issue-hours">⏱️ ${issue['Zeitaufwand (h)']} h verbracht</span>
+            <span class="issue-estimate">📊 ${issue['gesch. Zeitaufwand (h)']} h geschätzt</span>
+            <span class="issue-iid">ID: ${issue.IID}</span>
+          </div>
+        `;
+        
+        list.appendChild(li);
       });
     }
     
@@ -525,7 +561,12 @@
         
         baseColumns.forEach(col => {
           const td = document.createElement('td');
-          td.textContent = row[col] !== undefined ? row[col] : '';
+          if (col === 'Titel' && row.Typ === 'issue') {
+            const issueUrl = `${gitlabUrl}/${groupPath}/-/issues/${row.IID}`;
+            td.innerHTML = `<a href="${issueUrl}" target="_blank">${row[col]}</a>`;
+          } else {
+            td.textContent = row[col] !== undefined ? row[col] : '';
+          }
           tr.appendChild(td);
         });
         
