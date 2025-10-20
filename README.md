@@ -66,6 +66,5 @@ gitlab_timeapp/
 
 ## Was noch impementiert wird
 
-- % ist nur bei allen Daten (sonst erstellte issues in der zeit period)
 - mehr graphen
 - css bei tree ansicht soll schöner werden

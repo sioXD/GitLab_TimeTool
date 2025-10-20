@@ -303,6 +303,7 @@
     padding: 15px;
     margin-bottom: 10px;
     background: #f9f9f9;
+    border: 1px solid #4CAF50;
     border-left: 4px solid #4CAF50;
     border-radius: 4px;
     transition: all 0.3s;
@@ -358,6 +359,24 @@
   .loading {
     text-align: center;
   }
+.loader {
+  margin: auto;
+  width: 60px;
+  aspect-ratio: 2;
+  --_g: no-repeat radial-gradient(circle closest-side,#000 90%,#0000);
+  background: 
+    var(--_g) 0%   50%,
+    var(--_g) 50%  50%,
+    var(--_g) 100% 50%;
+  background-size: calc(100%/3) 50%;
+  animation: l3 1s infinite linear;
+}
+@keyframes l3 {
+    20%{background-position:0%   0%, 50%  50%,100%  50%}
+    40%{background-position:0% 100%, 50%   0%,100%  50%}
+    60%{background-position:0%  50%, 50% 100%,100%   0%}
+    80%{background-position:0%  50%, 50%  50%,100% 100%}
+}
   .error {
     background: #ffebee;
     color: #c62828;
@@ -637,7 +656,7 @@
       <button onclick="filterByDays(30)" class="filter-btn" data-days="30">Letzte 30 Tage</button>
     </div>
 
-    <div id="loading" class="loading">Daten werden geladen...</div>
+    <div id="loading" class="loading loader"></div>
     <div id="error" class="error" style="display:none;"></div>
     
     <div id="content" style="display:none;">
