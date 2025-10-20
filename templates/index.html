@@ -142,6 +142,22 @@
     .issue-iid {
       color: #9E9E9E;
     }
+    .user-badges {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .user-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: #E3F2FD;
+      border: 1px solid #2196F3;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #1976D2;
+      font-weight: 500;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -378,6 +394,30 @@
         // Build GitLab issue URL
         const issueUrl = `${gitlabUrl}/${groupPath}/${repositoryName}/-/issues/${issue.IID}`;
         
+        // Get users who worked on this issue (with percentage > 0)
+        const workingUsers = [];
+        for (const key in issue) {
+          // Check if it's a user column (not a standard column and has a percentage value)
+          if (!['Typ', 'Titel', 'IID', 'Parent IID', 'Zeitaufwand (h)', 'gesch. Zeitaufwand (h)', 'createdAt'].includes(key) 
+              && typeof issue[key] === 'number' 
+              && issue[key] > 0) {
+            workingUsers.push({
+              name: key,
+              percentage: issue[key]
+            });
+          }
+        }
+        
+        // Sort by percentage descending
+        workingUsers.sort((a, b) => b.percentage - a.percentage);
+        
+        // Create user badges HTML
+        const userBadgesHtml = workingUsers.length > 0 
+          ? `<div class="user-badges">
+               ${workingUsers.map(u => `<span class="user-badge">${u.name.replace(/ .*/,'')} (${(u.percentage * 100).toFixed(0)}%)</span>`).join('')}
+             </div>`
+          : '';
+        
         li.innerHTML = `
           <div class="issue-title">
             ${index + 1}. <a href="${issueUrl}" target="_blank">#${issue.IID} ${issue.Titel}</a>
@@ -387,6 +427,7 @@
             <span class="issue-estimate">📊 ${issue['gesch. Zeitaufwand (h)']} h geschätzt</span>
             <span class="issue-iid">ID: ${issue.IID}</span>
           </div>
+          ${userBadgesHtml}
         `;
         
         list.appendChild(li);
@@ -439,17 +480,35 @@
       const labels = Object.keys(labelStats).filter(l => labelStats[l].hours > 0);
       const hours = labels.map(l => labelStats[l].hours);
       
+      // Extract first word from label names
+      const shortLabels = labels.map(l => l.split(' ')[0]);
+      
+      // Use same colors as user chart
+      const colors = [
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(199, 199, 199, 0.7)',
+        'rgba(83, 102, 255, 0.7)',
+      ];
+      
+      const backgroundColors = labels.map((_, index) => colors[index % colors.length]);
+      const borderColors = backgroundColors.map(color => color.replace('0.7', '1'));
+      
       if (charts.labelChart) charts.labelChart.destroy();
       const ctx = document.getElementById('labelChart');
       charts.labelChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
+          labels: shortLabels,
           datasets: [{
             label: 'Stunden',
             data: hours,
-            backgroundColor: 'rgba(255, 159, 64, 0.7)',
-            borderColor: 'rgba(255, 159, 64, 1)',
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
             borderWidth: 1
           }]
         },
