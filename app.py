@@ -16,73 +16,79 @@ users = []
 labels = []
 epic_tree = None
 
-def load_data():
+def load_data(force_refresh=False):
     """Load data from GitLab API and build CSV rows structure"""
     global csv_rows, users, labels, epic_tree
-    csv_rows = []
-    users_set = set()
-    labels_set = set()
     
-    GROUP_FULL_PATH = os.getenv("GROUP_FULL_PATH")
-    EPIC_IID = os.getenv("EPIC_ROOT_ID")
-    
-    # Build epic tree
-    epic_tree = accumulateEpicTree(GROUP_FULL_PATH, EPIC_IID)
-    epic_tree.accumulateTimes()
-    
-    # Collect users and labels from all issues
-    def collect_users_labels(item):
-        if item.type == "issue":
-            try:
-                for user in item.userTimeMap.keys():
-                    users_set.add(user)
-            except:
-                pass
-            try:
-                for label in item.labels:
-                    labels_set.add(label)
-            except:
-                pass
-        for child in item.children:
-            collect_users_labels(child)
-    
-    collect_users_labels(epic_tree)
-    users = sorted(list(users_set))
-    labels = sorted(list(labels_set))
-    
-    # Build rows
-    def build_rows(e):
-        parentId = None if (e.parent == None) else e.parent.id
-        row = {
-            "Typ": e.type,
-            "Titel": e.title,
-            "IID": e.id,
-            "Parent IID": parentId,
-            "Zeitaufwand (h)": round(e.hoursSpent, 2),
-            "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2)
-        }
-        if e.type == "issue":
-            # Add user percentages
-            user_percentages = e.getUserPercentagesByTime()
-            for user in users:
-                row[user] = round(user_percentages.get(user, 0), 4)
-            # Add labels
-            for label in labels:
-                row[label] = e.hasLabel(label)
-            # Add createdAt
-            row["createdAt"] = getattr(e, 'createdAt', None)
-        else:
-            # For epics, set user and label columns to None or 0
-            for user in users:
-                row[user] = 0
-            for label in labels:
-                row[label] = False
-            row["createdAt"] = None
-        csv_rows.append(row)
-        for child in e.children:
-            build_rows(child)
-    
-    build_rows(epic_tree)
+    # Always reload if force_refresh is True
+    if force_refresh or epic_tree is None:
+        print(f"🔄 Fetching fresh data from GitLab...")
+        csv_rows = []
+        users_set = set()
+        labels_set = set()
+        
+        GROUP_FULL_PATH = os.getenv("GROUP_FULL_PATH")
+        EPIC_IID = os.getenv("EPIC_ROOT_ID")
+        
+        # Build epic tree
+        epic_tree = accumulateEpicTree(GROUP_FULL_PATH, EPIC_IID)
+        epic_tree.accumulateTimes()
+        
+        # Collect users and labels from all issues
+        def collect_users_labels(item):
+            if item.type == "issue":
+                try:
+                    for user in item.userTimeMap.keys():
+                        users_set.add(user)
+                except:
+                    pass
+                try:
+                    for label in item.labels:
+                        labels_set.add(label)
+                except:
+                    pass
+            for child in item.children:
+                collect_users_labels(child)
+        
+        collect_users_labels(epic_tree)
+        users = sorted(list(users_set))
+        labels = sorted(list(labels_set))
+        
+        # Build rows
+        def build_rows(e):
+            parentId = None if (e.parent == None) else e.parent.id
+            row = {
+                "Typ": e.type,
+                "Titel": e.title,
+                "IID": e.id,
+                "Parent IID": parentId,
+                "Zeitaufwand (h)": round(e.hoursSpent, 2),
+                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2)
+            }
+            if e.type == "issue":
+                # Add user percentages
+                user_percentages = e.getUserPercentagesByTime()
+                for user in users:
+                    row[user] = round(user_percentages.get(user, 0), 4)
+                # Add labels
+                for label in labels:
+                    row[label] = e.hasLabel(label)
+                # Add createdAt
+                row["createdAt"] = getattr(e, 'createdAt', None)
+            else:
+                # For epics, set user and label columns to None or 0
+                for user in users:
+                    row[user] = 0
+                for label in labels:
+                    row[label] = False
+                row["createdAt"] = None
+            csv_rows.append(row)
+            for child in e.children:
+                build_rows(child)
+        
+        build_rows(epic_tree)
+        print(f"✅ Data loaded successfully: {len(csv_rows)} items, {len(users)} users, {len(labels)} labels")
+        
     return csv_rows
 
 def filter_data_by_date(days=None):
@@ -214,14 +220,19 @@ def get_data():
     try:
         days = request.args.get('days', None)
         days = int(days) if days else None
+        refresh = request.args.get('refresh', 'false').lower() == 'true'
         
-        if epic_tree is None:
-            load_data()
+        # Only fetch fresh data if explicitly requested via refresh parameter
+        if refresh:
+            load_data(force_refresh=True)
+        elif epic_tree is None:
+            # Load data for the first time
+            load_data(force_refresh=False)
         
         if days:
             data = filter_data_by_date(days)
         else:
-            data = csv_rows if csv_rows else load_data()
+            data = csv_rows
         
         # Calculate statistics
         issues = [d for d in data if d['Typ'] == 'issue']

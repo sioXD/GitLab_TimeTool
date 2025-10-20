@@ -20,6 +20,33 @@
       color: #333;
       margin-bottom: 30px;
     }
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .reload-btn {
+      cursor: pointer;
+    }
+    .reload-btn:active {
+      transform: translateY(0);
+    }
+    .reload-btn.loading {
+      cursor: not-allowed;
+    }
+    .reload-icon {
+      font-size: 18px;
+      display: inline-block;
+      transition: transform 0.3s;
+    }
+    .reload-btn.loading .reload-icon {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .filter-bar {
       background: white;
       padding: 20px;
@@ -191,18 +218,6 @@
     }
     .loading {
       text-align: center;
-      padding: 60px;
-      font-size: 18px;
-      color: #666;
-    }
-    .loading::after {
-      content: '...';
-      animation: dots 1.5s steps(4, end) infinite;
-    }
-    @keyframes dots {
-      0%, 20% { content: '.'; }
-      40% { content: '..'; }
-      60%, 100% { content: '...'; }
     }
     .error {
       background: #ffebee;
@@ -236,8 +251,18 @@
 </head>
 <body>
   <div class="container">
-    <h1>⏱️ GitLab Time Tracking Dashboard</h1>
-    
+    <div class="header-section">
+      <h1>⏱️ GitLab Time Tracking Dashboard</h1>
+      <button id="reloadBtn" class="reload-btn" onclick="reloadData()">
+        <span class="reload-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+        </svg>
+        </span>
+      </button>
+    </div>
+
     <div class="filter-bar">
       <label>📅 Zeitraum:</label>
       <button onclick="filterByDays(null)" class="filter-btn active" data-days="all">Alle Tage</button>
@@ -272,6 +297,11 @@
           <h3>📈 Fortschritt (Spent vs. Estimated)</h3>
           <canvas id="progressChart"></canvas>
         </div>
+        
+        <div class="chart-container">
+          <h3>📅 Neu erstellte Issues nach Woche</h3>
+          <canvas id="creationChart"></canvas>
+        </div>
       </div>
       
       <div class="section">
@@ -292,16 +322,32 @@
     let gitlabUrl = 'https://gitlab.com';
     let groupPath = '';
     let repositoryName = '';
+    let isLoading = false;
 
-    async function loadData(days = null) {
+    async function loadData(days = null, forceRefresh = false) {
+      if (isLoading) {
+        console.log('Already loading data...');
+        return;
+      }
+      
       try {
+        isLoading = true;
+        updateReloadButton(true);
+        
         document.getElementById('loading').style.display = 'block';
         document.getElementById('content').style.display = 'none';
         document.getElementById('error').style.display = 'none';
         
         let url = "/api/data";
+        const params = [];
         if (days !== null) {
-          url += `?days=${days}`;
+          params.push(`days=${days}`);
+        }
+        if (forceRefresh) {
+          params.push('refresh=true');
+        }
+        if (params.length > 0) {
+          url += '?' + params.join('&');
         }
         
         const res = await fetch(url);
@@ -330,6 +376,7 @@
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
         createProgressChart(data);
+        createCreationChart(stats.creation_stats);
         
         // Create table
         createTable(data, users, labels);
@@ -343,7 +390,29 @@
         }
         errorDiv.style.display = 'block';
         console.error('Error loading data:', error);
+      } finally {
+        isLoading = false;
+        updateReloadButton(false);
       }
+    }
+    
+    function updateReloadButton(loading) {
+      const btn = document.getElementById('reloadBtn');
+      
+      if (loading) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+    
+    function reloadData() {
+      if (isLoading) return;
+      
+      console.log('🔄 Reloading data from GitLab...');
+      loadData(currentFilter, true);  // forceRefresh = true
     }
     
     function filterByDays(days) {
@@ -355,9 +424,9 @@
       });
       event.target.classList.add('active');
       
-      loadData(days);
+      loadData(days, false);  // forceRefresh = false
     }
-    
+
     function createStatsCards(stats) {
       const grid = document.getElementById('statsGrid');
       grid.innerHTML = `
@@ -577,6 +646,92 @@
       });
     }
     
+    function createCreationChart(creationStats) {
+      if (!creationStats || !creationStats.weeks || creationStats.weeks.length === 0) {
+        const ctx = document.getElementById('creationChart');
+        if (!ctx) return;
+        const parent = ctx.parentElement;
+        parent.innerHTML = '<h3>📅 Neu erstellte Issues nach Woche</h3><p style="text-align:center;color:#666;padding:40px;">Keine Daten verfügbar</p>';
+        return;
+      }
+      
+      const weeks = creationStats.weeks;
+      const userData = creationStats.user_data;
+      
+      // Generate colors for each user
+      const colors = [
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 159, 64, 0.7)',
+        'rgba(199, 199, 199, 0.7)',
+        'rgba(83, 102, 255, 0.7)',
+        'rgba(220, 20, 60, 0.7)',
+        'rgba(34, 139, 34, 0.7)',
+      ];
+      
+      const datasets = Object.keys(userData).map((user, index) => ({
+        label: user,
+        data: userData[user],
+        backgroundColor: colors[index % colors.length],
+        borderColor: colors[index % colors.length].replace('0.7', '1'),
+        borderWidth: 1
+      }));
+      
+      if (charts.creationChart) charts.creationChart.destroy();
+      const ctx = document.getElementById('creationChart');
+      if (!ctx) return;
+      
+      charts.creationChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: weeks.map(w => {
+            const date = new Date(w);
+            return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          }),
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            x: {
+              stacked: true,
+              title: { display: true, text: 'Woche (Montag)' }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              title: { display: true, text: 'Anzahl Issues' },
+              ticks: {
+                stepSize: 1
+              }
+            }
+          },
+          plugins: {
+            legend: { 
+              display: true,
+              position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  const weekStart = weeks[context[0].dataIndex];
+                  const date = new Date(weekStart);
+                  return 'Woche ab ' + date.toLocaleDateString('de-DE');
+                },
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + ' Issue(s)';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
     function createTable(data, users, labels) {
       const tableHead = document.getElementById('tableHead');
       const tableBody = document.getElementById('tableBody');
@@ -658,8 +813,8 @@
       });
     }
 
-    // Load data on page load
-    loadData();
+    // Load data on page load (initial load with refresh)
+    loadData(null, true);
   </script>
 </body>
 </html>
