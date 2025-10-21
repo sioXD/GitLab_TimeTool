@@ -495,28 +495,25 @@
   }
   .child-epics-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 20px;
     flex-wrap: wrap;
     padding: 20px;
-    background: #f5f5f5;
+    /* background: #f5f5f5; */
     border-radius: 8px;
     border-left: 4px solid #2196F3;
   }
   .child-epics-container.level-1 {
-    background: #e8f4f8;
     border-left-color: #2196F3;
   }
   .child-epics-container.level-2 {
-    background: #fff3e0;
-    border-left-color: #FF9800;
+    border-left-color: #2156f3; 
   }
   .child-epics-container.level-3 {
-    background: #f3e5f5;
-    border-left-color: #9C27B0;
+    border-left-color: rgb(33, 79, 243);
   }
   .child-epic {
-    flex: 1 1 300px;
+    flex: 1 1 100px;
     min-width: 280px;
     max-width: 450px;
     display: flex;
@@ -524,8 +521,7 @@
   }
   .child-epic .tree-node-content {
     margin: 0;
-    width: 100%;
-    max-width: 100%;
+    width: fit-content;
   }
   .child-epic .epic-content {
     margin-left: 0;
@@ -537,29 +533,25 @@
     gap: 15px;
     margin-top: 15px;
     padding-left: 15px;
-    border-left: 2px solid #e0e0e0;
   }
   .issue-list-wrapper {
-    background: #f9f9f9;
-    padding: 15px;
     border-radius: 8px;
     margin-top: 10px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    border-left: 3px solid #4CAF50;
   }
   .issue-item {
     background: white;
     padding: 15px;
     border-radius: 6px;
     border-left: 4px solid #4CAF50;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
     transition: all 0.3s;
   }
   .issue-item:hover {
     transform: translateX(3px);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
   }
   .issue-item-header {
     display: flex;
