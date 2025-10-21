@@ -57,6 +57,7 @@ def get_epic_and_children(group_path, epic_iid, token=None):
               createdAt
               timeEstimate
               totalTimeSpent
+              state
               labels{
                 nodes{
                   title
@@ -122,6 +123,8 @@ def accumulateEpicTree(group_path=None, epic_iid=None, parent_iid=None, token=No
         i.hoursEstimate = (issue['timeEstimate'] or 0) / 3600.
         i.hoursSpent = (issue['totalTimeSpent'] or 0) / 3600.
         i.createdAt = issue.get('createdAt')
+        i.state = issue.get('state') 
+
         
         for log in issue['timelogs']['nodes']:
             # Use name (full name) instead of username

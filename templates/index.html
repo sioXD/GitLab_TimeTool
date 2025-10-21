@@ -260,6 +260,8 @@
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-height: 650px;
+    overflow: auto;
   }
   .chart-container h3 {
     margin-top: 0;
@@ -553,6 +555,26 @@
     transform: translateX(3px);
     box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
   }
+  .issue-item.done {
+    opacity: 0.5;
+    background: #f5f5f5;
+  }
+  
+  .issue-item.done .issue-item-title {
+    text-decoration: line-through;
+    color: #999;
+  }
+  
+  .top-issues-list li.done {
+    opacity: 0.5;
+    background: #f5f5f5;
+  }
+  
+  .top-issues-list li.done .issue-title a {
+    text-decoration: line-through;
+    color: #999;
+  }
+  
   .issue-item-header {
     display: flex;
     justify-content: space-between;
@@ -988,11 +1010,17 @@
       topIssues.forEach((issue, index) => {
         const li = document.createElement('li');
         
+        // Check if issue is closed/done
+        const isDone = issue.state === 'closed';
+        if (isDone) {
+          li.classList.add('done');
+        }
+        
         const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${issue.IID}`;
         
         const workingUsers = [];
         for (const key in issue) {
-          if (!['Typ', 'Titel', 'IID', 'Parent IID', 'Zeitaufwand (h)', 'gesch. Zeitaufwand (h)', 'createdAt'].includes(key) 
+          if (!['Typ', 'Titel', 'IID', 'Parent IID', 'Zeitaufwand (h)', 'gesch. Zeitaufwand (h)', 'createdAt', 'state'].includes(key) 
               && typeof issue[key] === 'number' 
               && issue[key] > 0) {
             workingUsers.push({
@@ -1224,6 +1252,7 @@
       function renderIssue(issue) {
         const issueUrl = `${gitlabUrl}/${groupPath}${repositoryName ? '/' + repositoryName : ''}/-/issues/${issue.IID}`;
         const createdDate = issue.createdAt ? new Date(issue.createdAt).toLocaleDateString('de-DE') : 'N/A';
+        const isDone = issue.state === 'closed';
         
         const contributors = [];
         allUsers.forEach(user => {
@@ -1237,7 +1266,7 @@
         });
         contributors.sort((a, b) => b.percentage - a.percentage);
         
-        return `<div class="issue-item">
+        return `<div class="issue-item${isDone ? ' done' : ''}">
                   <div class="issue-item-header">
                     <div class="issue-item-title" onclick="window.open('${issueUrl}', '_blank')">
                       #${issue.IID} ${issue.Titel}
@@ -1256,6 +1285,7 @@
                       <span class="issue-stat-label">📊 Geplant:</span>
                       <span class="issue-stat-value hours-estimated">${issue['gesch. Zeitaufwand (h)']} h</span>
                     </div>
+                    ${isDone ? '<div class="issue-stat"><span class="issue-stat-label">✅ Status:</span><span class="issue-stat-value">Closed</span></div>' : ''}
                   </div>
                   ${contributors.length > 0 ? `
                     <div class="issue-contributors">

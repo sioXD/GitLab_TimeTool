@@ -81,8 +81,9 @@ def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
                 # Add labels
                 for label in labels:
                     row[label] = e.hasLabel(label)
-                # Add createdAt
+                # Add createdAt and state
                 row["createdAt"] = getattr(e, 'createdAt', None)
+                row["state"] = getattr(e, 'state', 'opened')  # Status hinzufügen
             else:
                 # For epics, set user and label columns to None or 0
                 for user in users:
@@ -90,6 +91,7 @@ def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
                 for label in labels:
                     row[label] = False
                 row["createdAt"] = None
+                row["state"] = None  # Epics haben keinen Status
             csv_rows.append(row)
             for child in e.children:
                 build_rows(child)
@@ -171,7 +173,8 @@ def filter_data_by_date(days=None):
                 "Parent IID": parentId,
                 "Zeitaufwand (h)": round(filtered_hours_spent, 2),
                 "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
-                "createdAt": getattr(e, 'createdAt', None)
+                "createdAt": getattr(e, 'createdAt', None),
+                "state": getattr(e, 'state', 'opened')  # Status hinzufügen
             }
             
             for user in users:
@@ -187,7 +190,8 @@ def filter_data_by_date(days=None):
                 "Parent IID": parentId,
                 "Zeitaufwand (h)": 0,
                 "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
-                "createdAt": None
+                "createdAt": None,
+                "state": None  # Epics haben keinen Status
             }
             for user in users:
                 row[user] = 0
