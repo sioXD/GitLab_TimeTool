@@ -67,4 +67,3 @@ gitlab_timeapp/
 ## Was noch impementiert wird
 
 - mehr graphen
-- css bei tree ansicht soll schöner werden

@@ -664,10 +664,10 @@
 
     <div class="filter-bar">
       <label>📅 Zeitraum:</label>
-      <button onclick="filterByDays(null)" class="filter-btn active" data-days="all">Alle Tage</button>
-      <button onclick="filterByDays(7)" class="filter-btn" data-days="7">Letzte 7 Tage</button>
+      <button onclick="filterByDays(7)" class="filter-btn active" data-days="7">Letzte 7 Tage</button>
       <button onclick="filterByDays(14)" class="filter-btn" data-days="14">Letzte 14 Tage</button>
       <button onclick="filterByDays(30)" class="filter-btn" data-days="30">Letzte 30 Tage</button>
+      <button onclick="filterByDays(null)" class="filter-btn" data-days="all">Alle Tage</button>
     </div>
 
     <div id="loading" class="loading loader"></div>
@@ -1412,7 +1412,7 @@ function toggleEpic(epicId) {
 }
     // Initialize and load data on page load
     initMode();
-    loadData(null, true);
+    loadData(7, false);
   </script>
 </body>
 </html>
