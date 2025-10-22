@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from Epic import Epic
 from Issue import Issue
 from timetracker import accumulateEpicTree
+from collections import defaultdict
 
 load_dotenv()
 
@@ -298,6 +299,9 @@ def get_data():
         # Calculate creation statistics
         creation_stats = calculate_creation_stats(issues, days)
         
+        # Calculate CFD statistics
+        cfd_stats = calculate_cfd_stats(issues, days)
+        
         # For local mode, use the provided group_path, otherwise from ENV
         if mode == 'local':
             response_group_path = group_full_path
@@ -318,7 +322,8 @@ def get_data():
                 "total_estimated": round(total_estimated, 2),
                 "user_stats": user_stats,
                 "label_stats": label_stats,
-                "creation_stats": creation_stats
+                "creation_stats": creation_stats,
+                "cfd_stats": cfd_stats
             }
         })
     except Exception as e:
@@ -331,7 +336,6 @@ def get_data():
 
 def calculate_creation_stats(issues, days=None):
     """Calculate issue creation statistics by time period"""
-    from collections import defaultdict
     
     if days is None:
         cutoff_date = None
@@ -398,6 +402,105 @@ def calculate_creation_stats(issues, days=None):
     
     # Remove users with no issues created
     result['user_data'] = {k: v for k, v in result['user_data'].items() if sum(v) > 0}
+    
+    return result
+
+def calculate_cfd_stats(issues, days=None):
+    """Calculate Cumulative Flow Diagram data - issues by status over time"""
+    
+    if days is None:
+        # Use all data, find the earliest issue
+        cutoff_date = None
+        all_dates = []
+        for issue in issues:
+            created_at = issue.get('createdAt')
+            if created_at:
+                try:
+                    if created_at.endswith('Z'):
+                        created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    elif '+' in created_at or created_at.count('-') > 2:
+                        created_date = datetime.fromisoformat(created_at)
+                    else:
+                        created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                    all_dates.append(created_date)
+                except:
+                    pass
+        
+        if all_dates:
+            cutoff_date = min(all_dates)
+        else:
+            cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=30)
+    else:
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
+    
+    # Create daily timeline
+    current_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = datetime.now(datetime.now().astimezone().tzinfo).replace(hour=23, minute=59, second=59)
+    
+    daily_status = {}
+    
+    # Calculate status counts per day
+    day = current_date
+    
+    while day <= end_date:
+        day_label = day.strftime('%Y-%m-%d')
+        
+        # Count issues by status on this day
+        todo_count = 0
+        in_progress_count = 0
+        done_count = 0
+        
+        for issue in issues:
+            created_at = issue.get('createdAt')
+            state = issue.get('state', 'opened')
+            time_spent = issue.get('Zeitaufwand (h)', 0)
+            
+            if not created_at:
+                continue
+            
+            try:
+                # Parse created date
+                if created_at.endswith('Z'):
+                    created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif '+' in created_at or created_at.count('-') > 2:
+                    created_date = datetime.fromisoformat(created_at)
+                else:
+                    created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                
+                # Only count issues that were created before or on this day
+                if created_date.date() <= day.date():
+                    # Classify issue status
+                    if state == 'closed':
+                        done_count += 1
+                    elif time_spent > 0:
+                        # If time was spent, consider it in progress
+                        in_progress_count += 1
+                    else:
+                        # No time spent and not closed = to do
+                        todo_count += 1
+                    
+            except Exception as ex:
+                continue
+        
+        daily_status[day_label] = {
+            'todo': todo_count,
+            'in_progress': in_progress_count,
+            'done': done_count,
+            'total': todo_count + in_progress_count + done_count
+        }
+        
+        day += timedelta(days=1)
+    
+    # Sort by date
+    sorted_dates = sorted(daily_status.keys())
+    
+    result = {
+        'dates': sorted_dates,
+        'todo': [daily_status[d]['todo'] for d in sorted_dates],
+        'in_progress': [daily_status[d]['in_progress'] for d in sorted_dates],
+        'done': [daily_status[d]['done'] for d in sorted_dates],
+        'total': [daily_status[d]['total'] for d in sorted_dates]
+    }
     
     return result
 

@@ -688,13 +688,13 @@
         </div>
         
         <div class="chart-container">
-          <h3>🏷️ Zeitaufwand nach Labels</h3>
-          <canvas id="labelChart"></canvas>
+          <h3>📊 Issue Bearbeitung</h3>
+          <canvas id="cfdChart"></canvas>
         </div>
         
         <div class="chart-container">
-          <h3>📈 Fortschritt (Spent vs. Estimated)</h3>
-          <canvas id="progressChart"></canvas>
+          <h3>🏷️ Zeitaufwand nach Labels</h3>
+          <canvas id="labelChart"></canvas>
         </div>
       </div>
       
@@ -733,7 +733,7 @@
   </div>
 
   <script>
-    let currentFilter = null;
+    let currentFilter = 7;
     let charts = {};
     let gitlabUrl = 'https://gitlab.com';
     let groupPath = '';
@@ -853,6 +853,117 @@
       }
     }
 
+    function createCFDChart(cfdStats) {
+      if (!cfdStats || !cfdStats.dates || cfdStats.dates.length === 0) {
+        return;
+      }
+      
+      const dates = cfdStats.dates.map(d => {
+        const date = new Date(d);
+        return date.toLocaleDateString('de-DE', { month: 'short', day: 'numeric' });
+      });
+      
+      if (charts.cfdChart) charts.cfdChart.destroy();
+      const ctx = document.getElementById('cfdChart');
+      charts.cfdChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [
+            {
+              label: 'Done',
+              data: cfdStats.done,
+              backgroundColor: 'rgba(76, 175, 80, 0.6)',
+              borderColor: 'rgba(76, 175, 80, 1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'In Progress',
+              data: cfdStats.in_progress,
+              backgroundColor: 'rgba(255, 193, 7, 0.6)',
+              borderColor: 'rgba(255, 193, 7, 1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'To Do',
+              data: cfdStats.todo,
+              backgroundColor: 'rgba(238, 75, 43, 0.6)',
+              borderColor: 'rgba(238, 75, 43, 1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          scales: {
+            x: {
+              title: { 
+                display: true, 
+                text: 'Datum',
+                font: { weight: 'bold' }
+              },
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              title: { 
+                display: true, 
+                text: 'Anzahl Issues',
+                font: { weight: 'bold' }
+              },
+              ticks: {
+                stepSize: 1
+              }
+            }
+          },
+          plugins: {
+            legend: { 
+              display: true,
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 15
+              }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                title: function(context) {
+                  return context[0].label;
+                },
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + ' Issues';
+                },
+                footer: function(tooltipItems) {
+                  const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
+                  return 'Gesamt: ' + total + ' Issues';
+                }
+              }
+            },
+            filler: {
+              propagate: true
+            }
+          }
+        }
+      });
+    }
+
     async function loadData(days = null, forceRefresh = false) {
       if (isLoading) {
         console.log('Already loading data...');
@@ -911,7 +1022,7 @@
         createTopIssuesList(data);
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
-        createProgressChart(data);
+        createCFDChart(stats.cfd_stats);  // Neues Chart hinzufügen
         createTreeDiagram(data, users);
         
       } catch (error) {
@@ -1156,55 +1267,7 @@
         }
       });
     }
-    
-    function createProgressChart(data) {
-      const issues = data.filter(d => d.Typ === 'issue' && d['gesch. Zeitaufwand (h)'] > 0);
-      
-      if (charts.progressChart) charts.progressChart.destroy();
-      const ctx = document.getElementById('progressChart');
-      charts.progressChart = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-          datasets: [{
-            label: 'Issues',
-            data: issues.map(d => ({
-              x: d['gesch. Zeitaufwand (h)'],
-              y: d['Zeitaufwand (h)'],
-              title: d.Titel
-            })),
-            backgroundColor: 'rgba(75, 192, 192, 0.6)',
-            borderColor: 'rgba(75, 192, 192, 1)',
-            borderWidth: 1,
-            pointRadius: 6,
-            pointHoverRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: {
-            x: { 
-              title: { display: true, text: 'Geschätzte Zeit (h)' },
-              beginAtZero: true
-            },
-            y: { 
-              title: { display: true, text: 'Verbrachte Zeit (h)' },
-              beginAtZero: true
-            }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return context.raw.title + ' - Geschätzt: ' + context.raw.x + 'h, Verbracht: ' + context.raw.y + 'h';
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-    
+        
     function createTreeDiagram(data, users) {
       const container = document.getElementById('treeContainer');
       
@@ -1412,7 +1475,7 @@ function toggleEpic(epicId) {
 }
     // Initialize and load data on page load
     initMode();
-    loadData(7, false);
+    loadData(currentFilter, false);
   </script>
 </body>
 </html>
