@@ -361,24 +361,24 @@
   .loading {
     text-align: center;
   }
-.loader {
-  margin: auto;
-  width: 60px;
-  aspect-ratio: 2;
-  --_g: no-repeat radial-gradient(circle closest-side,#000 90%,#0000);
-  background: 
-    var(--_g) 0%   50%,
-    var(--_g) 50%  50%,
-    var(--_g) 100% 50%;
-  background-size: calc(100%/3) 50%;
-  animation: l3 1s infinite linear;
-}
-@keyframes l3 {
+  .loader {
+    margin: auto;
+    width: 60px;
+    aspect-ratio: 2;
+    --_g: no-repeat radial-gradient(circle closest-side,#000 90%,#0000);
+    background: 
+      var(--_g) 0%   50%,
+      var(--_g) 50%  50%,
+      var(--_g) 100% 50%;
+    background-size: calc(100%/3) 50%;
+    animation: l3 1s infinite linear;
+  }
+  @keyframes l3 {
     20%{background-position:0%   0%, 50%  50%,100%  50%}
     40%{background-position:0% 100%, 50%   0%,100%  50%}
     60%{background-position:0%  50%, 50% 100%,100%   0%}
     80%{background-position:0%  50%, 50%  50%,100% 100%}
-}
+  }
   .error {
     background: #ffebee;
     color: #c62828;
@@ -631,6 +631,24 @@
     color: #1976D2;
     font-weight: 500;
   }
+  
+  .date-input {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: border-color 0.3s;
+  }
+  
+  .date-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+  }
+  
+  .date-input:hover {
+    border-color: #999;
+  }
 </style>
 </head>
 <body>
@@ -668,6 +686,16 @@
       <button onclick="filterByDays(14)" class="filter-btn" data-days="14">Letzte 14 Tage</button>
       <button onclick="filterByDays(30)" class="filter-btn" data-days="30">Letzte 30 Tage</button>
       <button onclick="filterByDays(null)" class="filter-btn" data-days="all">Alle Tage</button>
+      
+      <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+        <label>Von:</label>
+        <input type="date" id="startDate" class="date-input">
+        <label>Bis:</label>
+        <input type="date" id="endDate" class="date-input">
+        <button onclick="filterByDateRange()" class="filter-btn" style="background: #2196F3; color: white;">
+          📅 Anwenden
+        </button>
+      </div>
     </div>
 
     <div id="loading" class="loading loader"></div>
@@ -734,6 +762,7 @@
 
   <script>
     let currentFilter = 7;
+    let currentDateRange = null; // Neuer State für Datumsbereich
     let charts = {};
     let gitlabUrl = 'https://gitlab.com';
     let groupPath = '';
@@ -1053,18 +1082,122 @@
       if (isLoading) return;
       
       console.log('🔄 Reloading data from GitLab...');
-      loadData(currentFilter, true);
+      
+      if (currentDateRange) {
+        loadDataWithDateRange(currentDateRange.start, currentDateRange.end);
+      } else {
+        loadData(currentFilter, true);
+      }
     }
     
     function filterByDays(days) {
       currentFilter = days;
+      currentDateRange = null; // Reset date range
       
       document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
       });
       event.target.classList.add('active');
       
+      // Reset date inputs
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      
       loadData(days, false);
+    }
+
+    function filterByDateRange() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if (!startDate || !endDate) {
+        alert('Bitte wählen Sie Start- und Enddatum aus!');
+        return;
+      }
+      
+      if (new Date(startDate) > new Date(endDate)) {
+        alert('Startdatum muss vor dem Enddatum liegen!');
+        return;
+      }
+      
+      currentFilter = null;
+      currentDateRange = { start: startDate, end: endDate };
+      
+      // Remove active class from all preset buttons
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      loadDataWithDateRange(startDate, endDate);
+    }
+
+    async function loadDataWithDateRange(startDate, endDate) {
+      if (isLoading) {
+        console.log('Already loading data...');
+        return;
+      }
+      
+      try {
+        isLoading = true;
+        updateReloadButton(true);
+        
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('content').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+        
+        let url = "/api/data";
+        const params = [];
+        params.push(`start_date=${encodeURIComponent(startDate)}`);
+        params.push(`end_date=${encodeURIComponent(endDate)}`);
+        
+        if (currentMode === 'local') {
+          const config = getLocalConfig();
+          params.push(`mode=local`);
+          params.push(`token=${encodeURIComponent(config.token)}`);
+          params.push(`group_path=${encodeURIComponent(config.groupPath)}`);
+          params.push(`epic_id=${encodeURIComponent(config.epicId)}`);
+          if (config.repoName) {
+            params.push(`repo_name=${encodeURIComponent(config.repoName)}`);
+          }
+        }
+        
+        url += '?' + params.join('&');
+        
+        const res = await fetch(url);
+        const response = await res.json();
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Fehler beim Laden der Daten');
+        }
+        
+        const data = response.data;
+        const users = response.users || [];
+        const labels = response.labels || [];
+        const stats = response.stats || {};
+        groupPath = response.group_path || '';
+        repositoryName = response.repository_name || '';
+        allUsers = users;
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        
+        createStatsCards(stats);
+        createTopIssuesList(data);
+        createUserChart(stats.user_stats);
+        createLabelChart(stats.label_stats);
+        createCFDChart(stats.cfd_stats);
+        createTreeDiagram(data, users);
+        
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        const errorDiv = document.getElementById('error');
+        errorDiv.innerHTML = '<strong>Fehler:</strong> ' + error.message;
+        errorDiv.style.display = 'block';
+        console.error('Error loading data:', error);
+      } finally {
+        isLoading = false;
+        updateReloadButton(false);
+      }
     }
 
     function createStatsCards(stats) {
@@ -1072,7 +1205,7 @@
       
       let progressCard = '';
       
-      if (currentFilter === null) {
+      if (currentFilter === null && currentDateRange === null) {
         // Show progress percentage only for "Alle Daten"
         progressCard = `
           <div class="stat-card">

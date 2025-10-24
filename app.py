@@ -235,6 +235,8 @@ def get_data():
     try:
         days = request.args.get('days', None)
         days = int(days) if days else None
+        start_date = request.args.get('start_date', None)
+        end_date = request.args.get('end_date', None)
         refresh = request.args.get('refresh', 'false').lower() == 'true'
         mode = request.args.get('mode', 'env')
         
@@ -273,7 +275,10 @@ def get_data():
                 # Load data for the first time
                 load_data(force_refresh=False)
         
-        if days:
+        # Apply date filtering
+        if start_date and end_date:
+            data = filter_data_by_date_range(start_date, end_date)
+        elif days:
             data = filter_data_by_date(days)
         else:
             data = csv_rows
@@ -297,10 +302,12 @@ def get_data():
             }
         
         # Calculate creation statistics
-        creation_stats = calculate_creation_stats(issues, days)
-        
-        # Calculate CFD statistics
-        cfd_stats = calculate_cfd_stats(issues, days)
+        if start_date and end_date:
+            creation_stats = calculate_creation_stats_date_range(issues, start_date, end_date)
+            cfd_stats = calculate_cfd_stats_date_range(issues, start_date, end_date)
+        else:
+            creation_stats = calculate_creation_stats(issues, days)
+            cfd_stats = calculate_cfd_stats(issues, days)
         
         # For local mode, use the provided group_path, otherwise from ENV
         if mode == 'local':
@@ -333,6 +340,245 @@ def get_data():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+def filter_data_by_date_range(start_date_str, end_date_str):
+    """Filter time data by specific date range"""
+    try:
+        start_date = datetime.fromisoformat(start_date_str).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = datetime.fromisoformat(end_date_str).replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Make timezone aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
+    except Exception as e:
+        print(f"Error parsing date range: {e}")
+        return csv_rows
+    
+    filtered_rows = []
+    
+    def build_filtered_rows(e):
+        parentId = None if (e.parent == None) else e.parent.id
+        
+        if e.type == "issue":
+            filtered_hours_spent = 0
+            filtered_user_times = {}
+            
+            try:
+                for user, time_entries in e.userTimeMap.items():
+                    user_total = 0
+                    for entry in time_entries:
+                        date_str = entry['Datum']
+                        if date_str.endswith('Z'):
+                            entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        elif '+' in date_str or date_str.count('-') > 2:
+                            entry_date = datetime.fromisoformat(date_str)
+                        else:
+                            entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                        
+                        if entry_date.tzinfo is None:
+                            entry_date = entry_date.replace(tzinfo=start_date.tzinfo)
+                        
+                        if start_date <= entry_date <= end_date:
+                            user_total += entry['Zeit(Std)']
+                    
+                    if user_total > 0:
+                        filtered_user_times[user] = user_total
+                        filtered_hours_spent += user_total
+            except Exception as ex:
+                print(f"Error filtering date range for issue {e.title}: {ex}")
+                for user, time_entries in e.userTimeMap.items():
+                    user_total = sum(entry['Zeit(Std)'] for entry in time_entries)
+                    filtered_user_times[user] = user_total
+                    filtered_hours_spent += user_total
+            
+            user_percentages = {}
+            if filtered_hours_spent > 0:
+                for user in users:
+                    if user in filtered_user_times:
+                        user_percentages[user] = filtered_user_times[user] / filtered_hours_spent
+                    else:
+                        user_percentages[user] = 0
+            else:
+                for user in users:
+                    user_percentages[user] = 0
+            
+            row = {
+                "Typ": e.type,
+                "Titel": e.title,
+                "IID": e.id,
+                "Parent IID": parentId,
+                "Zeitaufwand (h)": round(filtered_hours_spent, 2),
+                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
+                "createdAt": getattr(e, 'createdAt', None),
+                "state": getattr(e, 'state', 'opened')
+            }
+            
+            for user in users:
+                row[user] = round(user_percentages.get(user, 0), 4)
+            for label in labels:
+                row[label] = e.hasLabel(label)
+                
+        else:  # Epic
+            row = {
+                "Typ": e.type,
+                "Titel": e.title,
+                "IID": e.id,
+                "Parent IID": parentId,
+                "Zeitaufwand (h)": 0,
+                "gesch. Zeitaufwand (h)": round(e.hoursEstimate, 2),
+                "createdAt": None,
+                "state": None
+            }
+            for user in users:
+                row[user] = 0
+            for label in labels:
+                row[label] = False
+        
+        filtered_rows.append(row)
+        
+        for child in e.children:
+            build_filtered_rows(child)
+        
+        if e.type == "epic":
+            child_rows = [r for r in filtered_rows if r.get("Parent IID") == e.id]
+            total_child_time = sum(r["Zeitaufwand (h)"] for r in child_rows)
+            row["Zeitaufwand (h)"] = round(total_child_time, 2)
+            
+            if total_child_time > 0:
+                for user in users:
+                    user_time_in_children = sum(
+                        r["Zeitaufwand (h)"] * r.get(user, 0) 
+                        for r in child_rows
+                    )
+                    row[user] = round(user_time_in_children / total_child_time if total_child_time > 0 else 0, 4)
+    
+    if epic_tree:
+        build_filtered_rows(epic_tree)
+    
+    return filtered_rows
+
+def calculate_creation_stats_date_range(issues, start_date_str, end_date_str):
+    """Calculate issue creation statistics for specific date range"""
+    start_date = datetime.fromisoformat(start_date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+    end_date = datetime.fromisoformat(end_date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+    
+    weekly_stats = defaultdict(lambda: defaultdict(int))
+    
+    for issue in issues:
+        created_at = issue.get('createdAt')
+        if not created_at:
+            continue
+        
+        try:
+            if created_at.endswith('Z'):
+                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif '+' in created_at or created_at.count('-') > 2:
+                created_date = datetime.fromisoformat(created_at)
+            else:
+                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            
+            if created_date.tzinfo is None:
+                created_date = created_date.replace(tzinfo=start_date.tzinfo)
+            
+            if not (start_date <= created_date <= end_date):
+                continue
+            
+            week_start = created_date - timedelta(days=created_date.weekday())
+            week_label = week_start.strftime('%Y-%m-%d')
+            
+            max_user = None
+            max_percentage = 0
+            for user in users:
+                percentage = issue.get(user, 0)
+                if percentage > max_percentage:
+                    max_percentage = percentage
+                    max_user = user
+            
+            if max_user:
+                weekly_stats[week_label][max_user] += 1
+            else:
+                weekly_stats[week_label]['Unbekannt'] += 1
+                
+        except Exception as ex:
+            continue
+    
+    sorted_weeks = sorted(weekly_stats.keys())
+    result = {
+        'weeks': sorted_weeks,
+        'user_data': {}
+    }
+    
+    for user in users + ['Unbekannt']:
+        result['user_data'][user] = [weekly_stats[week].get(user, 0) for week in sorted_weeks]
+    
+    result['user_data'] = {k: v for k, v in result['user_data'].items() if sum(v) > 0}
+    
+    return result
+
+def calculate_cfd_stats_date_range(issues, start_date_str, end_date_str):
+    """Calculate CFD statistics for specific date range"""
+    start_date = datetime.fromisoformat(start_date_str).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.now().astimezone().tzinfo)
+    end_date = datetime.fromisoformat(end_date_str).replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=datetime.now().astimezone().tzinfo)
+    
+    daily_status = {}
+    day = start_date
+    
+    while day <= end_date:
+        day_label = day.strftime('%Y-%m-%d')
+        
+        todo_count = 0
+        in_progress_count = 0
+        done_count = 0
+        
+        for issue in issues:
+            created_at = issue.get('createdAt')
+            state = issue.get('state', 'opened')
+            time_spent = issue.get('Zeitaufwand (h)', 0)
+            
+            if not created_at:
+                continue
+            
+            try:
+                if created_at.endswith('Z'):
+                    created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif '+' in created_at or created_at.count('-') > 2:
+                    created_date = datetime.fromisoformat(created_at)
+                else:
+                    created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                
+                if created_date.date() <= day.date():
+                    if state == 'closed':
+                        done_count += 1
+                    elif time_spent > 0:
+                        in_progress_count += 1
+                    else:
+                        todo_count += 1
+                    
+            except Exception as ex:
+                continue
+        
+        daily_status[day_label] = {
+            'todo': todo_count,
+            'in_progress': in_progress_count,
+            'done': done_count,
+            'total': todo_count + in_progress_count + done_count
+        }
+        
+        day += timedelta(days=1)
+    
+    sorted_dates = sorted(daily_status.keys())
+    
+    result = {
+        'dates': sorted_dates,
+        'todo': [daily_status[d]['todo'] for d in sorted_dates],
+        'in_progress': [daily_status[d]['in_progress'] for d in sorted_dates],
+        'done': [daily_status[d]['done'] for d in sorted_dates],
+        'total': [daily_status[d]['total'] for d in sorted_dates]
+    }
+    
+    return result
 
 def calculate_creation_stats(issues, days=None):
     """Calculate issue creation statistics by time period"""
