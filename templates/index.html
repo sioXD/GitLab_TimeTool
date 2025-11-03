@@ -655,7 +655,7 @@
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
   }
   
   .reports-header {
@@ -708,8 +708,9 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 15px;
-    max-height: 200px;
+    max-height: 115px;
     overflow-y: auto;
+    padding-top: 5px;
   }
   
   .report-card {
@@ -1184,7 +1185,7 @@
           borderColor: colors.border,
           backgroundColor: colors.background,
           borderWidth: 3,
-          pointRadius: 4,
+          pointRadius: 2,
           pointBackgroundColor: colors.border,
           tension: 0.3,
           fill: true

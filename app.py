@@ -980,9 +980,46 @@ def generate_weekly_report():
                     'count': len(label_issues),
                     'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
                 }
-        
+    
         # Get top issues
         top_issues = sorted(issues, key=lambda x: x['Zeitaufwand (h)'], reverse=True)[:5]
+        
+        # Calculate issues opened and closed in the last 7 days
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=7)
+        issues_opened_in_period = 0
+        issues_closed_in_period = 0
+        
+        # Get all issues (not filtered by time spent, but by creation/close date)
+        all_data = csv_rows
+        all_issues = [d for d in all_data if d['Typ'] == 'issue']
+        
+        for issue in all_issues:
+            # Check if created in period
+            created_at = issue.get('createdAt')
+            if created_at:
+                try:
+                    if created_at.endswith('Z'):
+                        created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    elif '+' in created_at or created_at.count('-') > 2:
+                        created_date = datetime.fromisoformat(created_at)
+                    else:
+                        created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                    
+                    if created_date.tzinfo is None:
+                        created_date = created_date.replace(tzinfo=cutoff_date.tzinfo)
+                    
+                    if created_date >= cutoff_date:
+                        issues_opened_in_period += 1
+                except:
+                    pass
+            
+            # Check if closed in period (we'd need closedAt field for accurate tracking)
+            # For now, we'll count closed issues with time spent in the period as proxy
+            if issue.get('state') == 'closed' and issue.get('Zeitaufwand (h)', 0) > 0:
+                # Check if any time was logged in the period
+                # This is an approximation since we don't have exact close date
+                if issue in issues:  # If it appears in filtered data, it had activity
+                    issues_closed_in_period += 1
         
         # Prepare data for LLM
         report_data = {
@@ -1001,8 +1038,10 @@ def generate_weekly_report():
                 }
                 for issue in top_issues
             ],
-            'total_issues': len(issues),
-            'closed_issues': len([i for i in issues if i.get('state') == 'closed'])
+            'total_issues': len(all_issues),
+            'closed_issues': len([i for i in all_issues if i.get('state') == 'closed']),
+            'issues_opened_in_period': issues_opened_in_period,
+            'issues_closed_in_period': issues_closed_in_period
         }
         
         # Call Google Gemini API
@@ -1017,16 +1056,17 @@ def generate_weekly_report():
 
 Projektdaten:
 - Berichtszeitraum: {report_data['date_range']} ({report_data['week']})
-- Gesamte aufgewendete Zeit: {report_data['total_hours']} Stunden
-- Geschätzte Zeit: {report_data['total_estimated']} Stunden
-- Fortschritt: {report_data['progress_percentage']}%
-- Anzahl bearbeiteter Issues: {report_data['total_issues']}
-- Davon abgeschlossen: {report_data['closed_issues']}
+- Gesamte aufgewendete Zeit: {report_data['total_hours']} Stunden (für diesen Berichtszeitraum)
+- Geschätzte Zeit: {report_data['total_estimated']} Stunden (für die gesamte Projekt Laufzeit)
+- Anzahl offener Issues: {report_data['total_issues'] - report_data['closed_issues']} (gesamt)
+- Anzahl geschlossener Issues: {report_data['closed_issues']} (gesamt)
+- Im Berichtszeitraum geöffnete Issues: {report_data['issues_opened_in_period']}
+- Im Berichtszeitraum geschlossene Issues: {report_data['issues_closed_in_period']}
 
 Zeitverteilung nach Mitarbeitern:
 {json.dumps(report_data['user_stats'], indent=2, ensure_ascii=False)}
 
-Zeitverteilung nach Kategorien:
+Zeitverteilung nach Gitlab Labeln:
 {json.dumps(report_data['label_stats'], indent=2, ensure_ascii=False)}
 
 Top 5 Issues nach Zeitaufwand:
@@ -1035,7 +1075,7 @@ Top 5 Issues nach Zeitaufwand:
 Erstelle einen gut strukturierten HTML-Report mit:
 1. Überschrift mit Berichtszeitraum
 2. Executive Summary (2-3 Sätze)
-3. Kennzahlen in einem übersichtlichen Layout
+3. Kennzahlen in einem übersichtlichen Layout (inkl. geöffnete/geschlossene Issues im Zeitraum)
 4. Zeitverteilung nach Mitarbeitern (als Tabelle)
 5. Zeitverteilung nach Kategorien (als Tabelle)
 6. Top 5 Issues
