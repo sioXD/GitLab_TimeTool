@@ -157,7 +157,7 @@
   }
   .modal-content {
     background-color: white;
-    margin: 10% auto;
+    margin: 10px auto;
     padding: 30px;
     border-radius: 8px;
     width: 90%;
@@ -649,6 +649,111 @@
   .date-input:hover {
     border-color: #999;
   }
+  
+  /* Reports Section */
+  .reports-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .reports-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .generate-report-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  
+  .generate-report-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  }
+  
+  .generate-report-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .btn-icon {
+    font-size: 18px;
+  }
+  
+  .reports-info {
+    color: #666;
+    font-size: 14px;
+    font-style: italic;
+  }
+  
+  .reports-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .report-card {
+    background: #f9f9f9;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  
+  .report-card:hover {
+    border-color: #4CAF50;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+  }
+  
+  .report-card-title {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+    font-size: 16px;
+  }
+  
+  .report-card-date {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  
+  .report-card-size {
+    color: #999;
+    font-size: 12px;
+  }
+  
+  .report-modal-content {
+    max-width: 1200px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  #reportContent {
+    padding: 20px;
+  }
 </style>
 </head>
 <body>
@@ -729,12 +834,38 @@
           <h3>📈 Zeitentwicklung nach Kategorien</h3>
           <canvas id="labelTimelineChart"></canvas>
         </div>
+        
+        <div class="chart-container">
+          <h2>📊 Wöchentliche Berichte</h2>
+          <div class="reports-section">
+            <div class="reports-header">
+              <button onclick="generateReport()" class="generate-report-btn" id="generateReportBtn">
+                <span class="btn-icon">📝</span> Bericht jetzt erstellen
+              </button>
+              <p class="reports-info">Automatische Berichte werden jeden Dienstag um 8:00 Uhr erstellt</p>
+            </div>
+            <div id="reportsList" class="reports-list">
+              <p class="loading">Lade Berichte...</p>
+            </div>
+          </div>
+        </div>
+        
       </div>
-      
+
       <div class="section">
         <h2>🌳 Projekt Struktur</h2>
         <div class="tree-container" id="treeContainer"></div>
       </div>
+      
+     
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div id="reportModal" class="modal">
+    <div class="modal-content report-modal-content">
+      <span class="close" onclick="closeReportModal()">&times;</span>
+      <div id="reportContent"></div>
     </div>
   </div>
 
@@ -1739,9 +1870,94 @@ function toggleEpic(epicId) {
     epicNode.classList.add('expanded');
   }
 }
+
+    // Reports functionality
+    async function loadReports() {
+      try {
+        const response = await fetch('/api/reports');
+        const result = await response.json();
+        
+        const listDiv = document.getElementById('reportsList');
+        
+        if (!result.success || result.reports.length === 0) {
+          listDiv.innerHTML = '<p class="loading">Keine Berichte vorhanden</p>';
+          return;
+        }
+        
+        listDiv.innerHTML = result.reports.map(report => `
+          <div class="report-card" onclick="viewReport('${report.filename}')">
+            <div class="report-card-title">📄 ${report.filename.replace('report_', '').replace('.html', '')}</div>
+            <div class="report-card-date">📅 Erstellt: ${report.created}</div>
+            <div class="report-card-size">📊 Größe: ${(report.size / 1024).toFixed(2)} KB</div>
+          </div>
+        `).join('');
+        
+      } catch (error) {
+        console.error('Error loading reports:', error);
+        document.getElementById('reportsList').innerHTML = '<p class="loading">Fehler beim Laden der Berichte</p>';
+      }
+    }
+    
+    async function generateReport() {
+      const btn = document.getElementById('generateReportBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="btn-icon">⏳</span> Bericht wird erstellt...';
+      
+      try {
+        const response = await fetch('/api/generate-report', {
+          method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('✅ Bericht erfolgreich erstellt!');
+          loadReports();
+        } else {
+          alert('❌ Fehler beim Erstellen des Berichts: ' + result.error);
+        }
+      } catch (error) {
+        console.error('Error generating report:', error);
+        alert('❌ Fehler beim Erstellen des Berichts');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="btn-icon">📝</span> Bericht jetzt erstellen';
+      }
+    }
+    
+    function viewReport(filename) {
+      const modal = document.getElementById('reportModal');
+      const contentDiv = document.getElementById('reportContent');
+      
+      contentDiv.innerHTML = '<p style="text-align: center;">Lade Bericht...</p>';
+      modal.style.display = 'block';
+      
+      fetch(`/reports/${filename}`)
+        .then(response => response.text())
+        .then(html => {
+          contentDiv.innerHTML = html;
+        })
+        .catch(error => {
+          console.error('Error loading report:', error);
+          contentDiv.innerHTML = '<p style="text-align: center; color: red;">Fehler beim Laden des Berichts</p>';
+        });
+    }
+    
+    function closeReportModal() {
+      document.getElementById('reportModal').style.display = 'none';
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('reportModal');
+      if (event.target == modal) {
+        closeReportModal();
+      }
+    }
+    
     // Initialize and load data on page load
     initMode();
     loadData(currentFilter, false);
+    loadReports();
   </script>
 </body>
 </html>

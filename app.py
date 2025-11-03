@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from dotenv import load_dotenv
 import os
 from datetime import datetime, timedelta
@@ -6,10 +6,29 @@ from Epic import Epic
 from Issue import Issue
 from timetracker import accumulateEpicTree
 from collections import defaultdict
+import requests
+import json
+from pathlib import Path
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from google import genai
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Initialize scheduler for automated reports
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+# Schedule weekly report generation (every Tuesday at 8:00 AM)
+scheduler.add_job(
+    func=lambda: generate_weekly_report(),
+    trigger=CronTrigger(day_of_week='tue', hour=8, minute=0),
+    id='weekly_report',
+    name='Generate weekly project status report',
+    replace_existing=True
+)
 
 # Global variables for data
 csv_rows = []
@@ -931,6 +950,172 @@ def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_
     }
     
     return result
+
+def generate_weekly_report():
+    """Generate weekly project status report using OpenRouter API"""
+    try:
+        # Ensure reports directory exists
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        
+        # Get data from last week
+        last_week_data = filter_data_by_date(7)
+        issues = [d for d in last_week_data if d['Typ'] == 'issue']
+        
+        # Calculate statistics
+        total_spent = sum(d['Zeitaufwand (h)'] for d in issues)
+        total_estimated = sum(d['gesch. Zeitaufwand (h)'] for d in issues)
+        
+        user_stats = {}
+        for user in users:
+            user_total = sum(d['Zeitaufwand (h)'] * d.get(user, 0) for d in issues)
+            if user_total > 0:
+                user_stats[user] = round(user_total, 2)
+        
+        label_stats = {}
+        for label in labels:
+            label_issues = [d for d in issues if d.get(label, False)]
+            if len(label_issues) > 0:
+                label_stats[label] = {
+                    'count': len(label_issues),
+                    'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
+                }
+        
+        # Get top issues
+        top_issues = sorted(issues, key=lambda x: x['Zeitaufwand (h)'], reverse=True)[:5]
+        
+        # Prepare data for LLM
+        report_data = {
+            'week': f"KW {datetime.now().isocalendar()[1]}, {datetime.now().year}",
+            'date_range': f"{(datetime.now() - timedelta(days=7)).strftime('%d.%m.%Y')} - {datetime.now().strftime('%d.%m.%Y')}",
+            'total_hours': total_spent,
+            'total_estimated': total_estimated,
+            'progress_percentage': round((total_spent / total_estimated * 100) if total_estimated > 0 else 0, 1),
+            'user_stats': user_stats,
+            'label_stats': label_stats,
+            'top_issues': [
+                {
+                    'title': issue['Titel'],
+                    'iid': issue['IID'],
+                    'hours': issue['Zeitaufwand (h)']
+                }
+                for issue in top_issues
+            ],
+            'total_issues': len(issues),
+            'closed_issues': len([i for i in issues if i.get('state') == 'closed'])
+        }
+        
+        # Call Google Gemini API
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
+        
+        # Create Gemini client
+        client = genai.Client(api_key=gemini_api_key)
+        
+        prompt = f"""Erstelle einen professionellen Projektstatusreport in HTML-Format für die letzte Woche.
+
+Projektdaten:
+- Berichtszeitraum: {report_data['date_range']} ({report_data['week']})
+- Gesamte aufgewendete Zeit: {report_data['total_hours']} Stunden
+- Geschätzte Zeit: {report_data['total_estimated']} Stunden
+- Fortschritt: {report_data['progress_percentage']}%
+- Anzahl bearbeiteter Issues: {report_data['total_issues']}
+- Davon abgeschlossen: {report_data['closed_issues']}
+
+Zeitverteilung nach Mitarbeitern:
+{json.dumps(report_data['user_stats'], indent=2, ensure_ascii=False)}
+
+Zeitverteilung nach Kategorien:
+{json.dumps(report_data['label_stats'], indent=2, ensure_ascii=False)}
+
+Top 5 Issues nach Zeitaufwand:
+{json.dumps(report_data['top_issues'], indent=2, ensure_ascii=False)}
+
+Erstelle einen gut strukturierten HTML-Report mit:
+1. Überschrift mit Berichtszeitraum
+2. Executive Summary (2-3 Sätze)
+3. Kennzahlen in einem übersichtlichen Layout
+4. Zeitverteilung nach Mitarbeitern (als Tabelle)
+5. Zeitverteilung nach Kategorien (als Tabelle)
+6. Top 5 Issues
+7. Zusammenfassung und Ausblick
+
+Verwende modernes CSS (inline) mit professionellem Design, Farben und guter Lesbarkeit.
+Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
+
+        # Generate content with Gemini
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        html_report = response.text
+        
+        # Clean up markdown code blocks if present
+        if html_report.startswith('```html'):
+            html_report = html_report.replace('```html', '').replace('```', '').strip()
+        elif html_report.startswith('```'):
+            html_report = html_report.replace('```', '').strip()
+        
+        # Save report
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = f"report_{timestamp}.html"
+        filepath = reports_dir / filename
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_report)
+        
+        print(f"✅ Weekly report generated: {filename}")
+        return {
+            'success': True,
+            'filename': filename,
+            'filepath': str(filepath),
+            'data': report_data
+        }
+        
+    except Exception as e:
+        print(f"❌ Error generating weekly report: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+@app.route("/api/generate-report", methods=['POST'])
+def api_generate_report():
+    """API endpoint to manually trigger report generation"""
+    result = generate_weekly_report()
+    return jsonify(result)
+
+@app.route("/api/reports")
+def list_reports():
+    """List all available reports"""
+    try:
+        reports_dir = Path("reports")
+        if not reports_dir.exists():
+            return jsonify({'success': True, 'reports': []})
+        
+        reports = []
+        for file in sorted(reports_dir.glob("report_*.html"), reverse=True):
+            reports.append({
+                'filename': file.name,
+                'created': datetime.fromtimestamp(file.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                'size': file.stat().st_size
+            })
+        
+        return jsonify({'success': True, 'reports': reports})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route("/reports/<filename>")
+def serve_report(filename):
+    """Serve a specific report file"""
+    try:
+        reports_dir = Path("reports")
+        return send_from_directory(reports_dir, filename)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
 
 if __name__ == "__main__":
     app.run(debug=True)

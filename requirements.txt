@@ -4,3 +4,5 @@ python-dotenv
 plotly
 pandas
 gunicorn
+apscheduler
+google-genai
