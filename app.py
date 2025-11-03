@@ -305,9 +305,20 @@ def get_data():
         if start_date and end_date:
             creation_stats = calculate_creation_stats_date_range(issues, start_date, end_date)
             cfd_stats = calculate_cfd_stats_date_range(issues, start_date, end_date)
+            label_timeline_stats = calculate_label_timeline_stats_date_range(
+                issues, 
+                ["Anforderungen", "Dokumentation", "Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"],
+                start_date, 
+                end_date
+            )
         else:
             creation_stats = calculate_creation_stats(issues, days)
             cfd_stats = calculate_cfd_stats(issues, days)
+            label_timeline_stats = calculate_label_timeline_stats(
+                issues, 
+                ["Anforderungen", "Dokumentation", "Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"],
+                days
+            )
         
         # For local mode, use the provided group_path, otherwise from ENV
         if mode == 'local':
@@ -330,7 +341,8 @@ def get_data():
                 "user_stats": user_stats,
                 "label_stats": label_stats,
                 "creation_stats": creation_stats,
-                "cfd_stats": cfd_stats
+                "cfd_stats": cfd_stats,
+                "label_timeline_stats": label_timeline_stats
             }
         })
     except Exception as e:
@@ -746,6 +758,176 @@ def calculate_cfd_stats(issues, days=None):
         'in_progress': [daily_status[d]['in_progress'] for d in sorted_dates],
         'done': [daily_status[d]['done'] for d in sorted_dates],
         'total': [daily_status[d]['total'] for d in sorted_dates]
+    }
+    
+    return result
+
+def calculate_label_timeline_stats(issues, target_labels, days=None):
+    """Calculate timeline statistics for specific labels"""
+    from collections import defaultdict
+    
+    if days is None:
+        # Use all data, find the earliest issue
+        cutoff_date = None
+        all_dates = []
+        for issue in issues:
+            created_at = issue.get('createdAt')
+            if created_at:
+                try:
+                    if created_at.endswith('Z'):
+                        created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    elif '+' in created_at or created_at.count('-') > 2:
+                        created_date = datetime.fromisoformat(created_at)
+                    else:
+                        created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                    all_dates.append(created_date)
+                except:
+                    pass
+        
+        if all_dates:
+            cutoff_date = min(all_dates)
+        else:
+            cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=30)
+    else:
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
+    
+    # Create daily timeline
+    current_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = datetime.now(datetime.now().astimezone().tzinfo).replace(hour=23, minute=59, second=59)
+    
+    daily_label_hours = defaultdict(lambda: {label: 0 for label in target_labels})
+    
+    # Iterate through each issue and accumulate time spent per label per day
+    for issue in issues:
+        created_at = issue.get('createdAt')
+        if not created_at:
+            continue
+        
+        try:
+            # Parse created date
+            if created_at.endswith('Z'):
+                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif '+' in created_at or created_at.count('-') > 2:
+                created_date = datetime.fromisoformat(created_at)
+            else:
+                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            
+            # Check which labels this issue has
+            issue_labels = [label for label in target_labels if issue.get(label, False)]
+            
+            if not issue_labels:
+                continue
+            
+            # Get total time spent on this issue
+            time_spent = issue.get('Zeitaufwand (h)', 0)
+            
+            if time_spent > 0:
+                # Distribute time equally among the issue's matching labels
+                time_per_label = time_spent / len(issue_labels)
+                
+                # Assign this time to the creation date
+                day_label = created_date.strftime('%Y-%m-%d')
+                
+                if created_date >= current_date and created_date <= end_date:
+                    for label in issue_labels:
+                        daily_label_hours[day_label][label] += time_per_label
+                    
+        except Exception as ex:
+            continue
+    
+    # Create cumulative timeline
+    day = current_date
+    cumulative_hours = {label: 0 for label in target_labels}
+    sorted_dates = []
+    cumulative_data = defaultdict(list)
+    
+    while day <= end_date:
+        day_label = day.strftime('%Y-%m-%d')
+        sorted_dates.append(day_label)
+        
+        # Add today's hours to cumulative
+        for label in target_labels:
+            cumulative_hours[label] += daily_label_hours[day_label].get(label, 0)
+            cumulative_data[label].append(round(cumulative_hours[label], 2))
+        
+        day += timedelta(days=1)
+    
+    result = {
+        'dates': sorted_dates,
+        'labels': target_labels,
+        'data': {label: cumulative_data[label] for label in target_labels}
+    }
+    
+    return result
+
+def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_str, end_date_str):
+    """Calculate timeline statistics for specific labels in a date range"""
+    from collections import defaultdict
+    
+    start_date = datetime.fromisoformat(start_date_str).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.now().astimezone().tzinfo)
+    end_date = datetime.fromisoformat(end_date_str).replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=datetime.now().astimezone().tzinfo)
+    
+    daily_label_hours = defaultdict(lambda: {label: 0 for label in target_labels})
+    
+    # Iterate through each issue and accumulate time spent per label per day
+    for issue in issues:
+        created_at = issue.get('createdAt')
+        if not created_at:
+            continue
+        
+        try:
+            # Parse created date
+            if created_at.endswith('Z'):
+                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif '+' in created_at or created_at.count('-') > 2:
+                created_date = datetime.fromisoformat(created_at)
+            else:
+                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            
+            # Check which labels this issue has
+            issue_labels = [label for label in target_labels if issue.get(label, False)]
+            
+            if not issue_labels:
+                continue
+            
+            # Get total time spent on this issue
+            time_spent = issue.get('Zeitaufwand (h)', 0)
+            
+            if time_spent > 0:
+                # Distribute time equally among the issue's matching labels
+                time_per_label = time_spent / len(issue_labels)
+                
+                # Assign this time to the creation date
+                day_label = created_date.strftime('%Y-%m-%d')
+                
+                if created_date >= start_date and created_date <= end_date:
+                    for label in issue_labels:
+                        daily_label_hours[day_label][label] += time_per_label
+                    
+        except Exception as ex:
+            continue
+    
+    # Create cumulative timeline
+    day = start_date
+    cumulative_hours = {label: 0 for label in target_labels}
+    sorted_dates = []
+    cumulative_data = defaultdict(list)
+    
+    while day <= end_date:
+        day_label = day.strftime('%Y-%m-%d')
+        sorted_dates.append(day_label)
+        
+        # Add today's hours to cumulative
+        for label in target_labels:
+            cumulative_hours[label] += daily_label_hours[day_label].get(label, 0)
+            cumulative_data[label].append(round(cumulative_hours[label], 2))
+        
+        day += timedelta(days=1)
+    
+    result = {
+        'dates': sorted_dates,
+        'labels': target_labels,
+        'data': {label: cumulative_data[label] for label in target_labels}
     }
     
     return result

@@ -724,6 +724,11 @@
           <h3>🏷️ Zeitaufwand nach Labels</h3>
           <canvas id="labelChart"></canvas>
         </div>
+        
+        <div class="chart-container">
+          <h3>📈 Zeitentwicklung nach Kategorien</h3>
+          <canvas id="labelTimelineChart"></canvas>
+        </div>
       </div>
       
       <div class="section">
@@ -992,6 +997,132 @@
         }
       });
     }
+    
+    function createLabelTimelineChart(labelTimelineStats) {
+      if (!labelTimelineStats || !labelTimelineStats.dates || labelTimelineStats.dates.length === 0) {
+        return;
+      }
+      
+      const dates = labelTimelineStats.dates.map(d => {
+        const date = new Date(d);
+        return date.toLocaleDateString('de-DE', { month: 'short', day: 'numeric' });
+      });
+      
+      const labels = labelTimelineStats.labels || [];
+      const datasets = [];
+      
+      // Define colors for each label
+      const labelColors = {
+        'Anforderungen': {
+          border: 'rgba(33, 150, 243, 1)',
+          background: 'rgba(33, 150, 243, 0.1)'
+        },
+        'Dokumentation': {
+          border: 'rgba(156, 39, 176, 1)',
+          background: 'rgba(156, 39, 176, 0.1)'
+        },
+        'Entwurf': {
+          border: 'rgba(0, 188, 212, 1)',
+          background: 'rgba(0, 188, 212, 0.1)'
+        },
+        'Implementation & Test': {
+          border: 'rgba(76, 175, 80, 1)',
+          background: 'rgba(76, 175, 80, 0.1)'
+        },
+        'Projektmanagement': {
+          border: 'rgba(255, 152, 0, 1)',
+          background: 'rgba(255, 152, 0, 0.1)'
+        },
+        'Requirements Engineering': {
+          border: 'rgba(233, 30, 99, 1)',
+          background: 'rgba(233, 30, 99, 0.1)'
+        }
+      };
+      
+      // Create dataset for each label
+      labels.forEach(label => {
+        const data = labelTimelineStats.data[label] || [];
+        const colors = labelColors[label] || {
+          border: 'rgba(96, 125, 139, 1)',
+          background: 'rgba(96, 125, 139, 0.1)'
+        };
+        
+        datasets.push({
+          label: label,
+          data: data,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          borderWidth: 3,
+          pointRadius: 4,
+          pointBackgroundColor: colors.border,
+          tension: 0.3,
+          fill: true
+        });
+      });
+      
+      if (charts.labelTimelineChart) charts.labelTimelineChart.destroy();
+      const ctx = document.getElementById('labelTimelineChart');
+      charts.labelTimelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            x: {
+              title: { 
+                display: true, 
+                text: 'Datum',
+                font: { weight: 'bold' }
+              },
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: { 
+                display: true, 
+                text: 'Kumulierte Stunden',
+                font: { weight: 'bold' }
+              }
+            }
+          },
+          plugins: {
+            legend: { 
+              display: true,
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                padding: 15
+              }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                label: function(context) {
+                  return context.dataset.label + ': ' + context.parsed.y + ' h';
+                },
+                footer: function(tooltipItems) {
+                  const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
+                  return 'Gesamt: ' + total.toFixed(2) + ' h';
+                }
+              }
+            }
+          },
+          interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false
+          }
+        }
+      });
+    }
 
     async function loadData(days = null, forceRefresh = false) {
       if (isLoading) {
@@ -1051,7 +1182,8 @@
         createTopIssuesList(data);
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
-        createCFDChart(stats.cfd_stats);  // Neues Chart hinzufügen
+        createCFDChart(stats.cfd_stats);
+        createLabelTimelineChart(stats.label_timeline_stats);
         createTreeDiagram(data, users);
         
       } catch (error) {
@@ -1186,6 +1318,7 @@
         createUserChart(stats.user_stats);
         createLabelChart(stats.label_stats);
         createCFDChart(stats.cfd_stats);
+        createLabelTimelineChart(stats.label_timeline_stats);
         createTreeDiagram(data, users);
         
       } catch (error) {
