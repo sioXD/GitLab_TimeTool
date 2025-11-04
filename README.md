@@ -9,6 +9,7 @@ Ein interaktives Dashboard zur Visualisierung und Analyse von Zeiterfassungsdate
 - Python 3.8 oder höher
 - GitLab Account mit API-Zugriff
 - Personal Access Token mit `api` Scope
+- Gemini API KEY (optional)
 
 ## ⚙️ Konfiguration
 
@@ -18,9 +19,10 @@ Erstellen Sie eine `.env` Datei im Projektverzeichnis:
 
 ```env
 TOKEN=ihr_gitlab_personal_access_token
-GROUP_FULL_PATH=ihre-gruppe/ihre-untergruppe
-EPIC_ROOT_ID=123
+GROUP_FULL_PATH=obergruppe/ihre-gruppe/ihre-untergruppe
+EPIC_ROOT_ID=8
 REPOSITORY_NAME=ihr-projekt
+GEMINI_API_KEY=gemini-api-key
 ```
 
 ### Schritt 2: GitLab Personal Access Token erstellen
@@ -63,7 +65,3 @@ gitlab_timeapp/
 ├── .env                  # Konfigurationsdatei (nicht im Git!)
 └── README.md            # Diese Datei
 ```
-
-## Was noch impementiert wird
-
-- mehr graphen
