@@ -1904,10 +1904,20 @@ function toggleEpic(epicId) {
       btn.disabled = true;
       btn.innerHTML = '<span class="btn-icon">⏳</span> Bericht wird erstellt...';
       
-      try {
+      try {        
         const response = await fetch('/api/generate-report', {
-          method: 'POST'
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
+        
+        // Check if response is ok
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+        
         const result = await response.json();
         
         if (result.success) {
@@ -1918,7 +1928,7 @@ function toggleEpic(epicId) {
         }
       } catch (error) {
         console.error('Error generating report:', error);
-        alert('❌ Fehler beim Erstellen des Berichts');
+        alert('❌ Fehler beim Erstellen des Berichts: ' + error.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<span class="btn-icon">📝</span> Bericht jetzt erstellen';
