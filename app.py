@@ -321,12 +321,14 @@ def get_data():
             }
         
         # Calculate creation statistics
+        target_matrix_labels = ["Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"]
+        
         if start_date and end_date:
             creation_stats = calculate_creation_stats_date_range(issues, start_date, end_date)
             cfd_stats = calculate_cfd_stats_date_range(issues, start_date, end_date)
             label_timeline_stats = calculate_label_timeline_stats_date_range(
                 issues, 
-                ["Anforderungen", "Dokumentation", "Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"],
+                target_matrix_labels,
                 start_date, 
                 end_date
             )
@@ -335,9 +337,11 @@ def get_data():
             cfd_stats = calculate_cfd_stats(issues, days)
             label_timeline_stats = calculate_label_timeline_stats(
                 issues, 
-                ["Anforderungen", "Dokumentation", "Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"],
+                target_matrix_labels,
                 days
             )
+            
+        user_label_matrix = calculate_user_label_matrix(issues, target_matrix_labels, users)
         
         # For local mode, use the provided group_path, otherwise from ENV
         if mode == 'local':
@@ -361,7 +365,8 @@ def get_data():
                 "label_stats": label_stats,
                 "creation_stats": creation_stats,
                 "cfd_stats": cfd_stats,
-                "label_timeline_stats": label_timeline_stats
+                "label_timeline_stats": label_timeline_stats,
+                "user_label_matrix": user_label_matrix
             }
         })
     except Exception as e:
@@ -951,6 +956,39 @@ def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_
     
     return result
 
+def calculate_user_label_matrix(issues, target_labels, users):
+    """Calculate matrix of time spent by user per label"""
+    # Initialize matrix
+    matrix = {user: {label: 0.0 for label in target_labels} for user in users}
+    
+    for issue in issues:
+        # Find which target labels this issue has
+        active_labels = [label for label in target_labels if issue.get(label, False)]
+        
+        if not active_labels:
+            continue
+            
+        total_time = issue.get('Zeitaufwand (h)', 0)
+        if total_time <= 0:
+            continue
+            
+        # Calculate time per label (distribute equally if multiple labels)
+        for user in users:
+            user_percentage = issue.get(user, 0)
+            if user_percentage > 0:
+                user_time = total_time * user_percentage
+                time_per_label = user_time / len(active_labels)
+                
+                for label in active_labels:
+                    matrix[user][label] += time_per_label
+                    
+    # Round values
+    for user in matrix:
+        for label in matrix[user]:
+            matrix[user][label] = round(matrix[user][label], 2)
+            
+    return matrix
+
 def generate_weekly_report():
     """Generate weekly project status report using OpenRouter API"""
     try:
@@ -1023,6 +1061,10 @@ def generate_weekly_report():
                 if issue in issues:  # If it appears in filtered data, it had activity
                     issues_closed_in_period += 1
         
+        # Calculate user label matrix
+        target_matrix_labels = ["Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"]
+        user_label_matrix = calculate_user_label_matrix(issues, target_matrix_labels, users)
+
         # Prepare data for LLM
         report_data = {
             'week': f"KW {datetime.now().isocalendar()[1]}, {datetime.now().year}",
@@ -1032,6 +1074,7 @@ def generate_weekly_report():
             'progress_percentage': round((total_spent / total_estimated * 100) if total_estimated > 0 else 0, 1),
             'user_stats': user_stats,
             'label_stats': label_stats,
+            'user_label_matrix': user_label_matrix,
             'top_issues': [
                 {
                     'title': issue['Titel'],
@@ -1068,8 +1111,8 @@ Projektdaten:
 Zeitverteilung nach Mitarbeitern:
 {json.dumps(report_data['user_stats'], indent=2, ensure_ascii=False)}
 
-Zeitverteilung nach Gitlab Labeln:
-{json.dumps(report_data['label_stats'], indent=2, ensure_ascii=False)}
+Zeitmatrix (Mitarbeiter und Überkategorien):
+{json.dumps(report_data['user_label_matrix'], indent=2, ensure_ascii=False)}
 
 Top 5 Issues nach Zeitaufwand:
 {json.dumps(report_data['top_issues'], indent=2, ensure_ascii=False)}
@@ -1079,7 +1122,7 @@ Erstelle einen gut strukturierten HTML-Report mit:
 2. Executive Summary (2-3 Sätze)
 3. Kennzahlen in einem übersichtlichen Layout (inkl. geöffnete/geschlossene Issues im Zeitraum)
 4. Zeitverteilung nach Mitarbeitern (als Tabelle)
-5. Zeitverteilung nach Kategorien (als Tabelle)
+5. Zeitmatrix: Mitarbeiter und Überkategorien (als Tabelle)
 6. Top 5 Issues
 7. Zusammenfassung und Ausblick
 

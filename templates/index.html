@@ -755,6 +755,37 @@
   #reportContent {
     padding: 20px;
   }
+
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .matrix-table th, .matrix-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+  }
+  .matrix-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  .matrix-table th:first-child {
+    min-width: 120px;
+  }
+  .matrix-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  .matrix-table tr:hover {
+    background-color: #f1f1f1;
+  }
+  .matrix-value {
+    font-weight: 500;
+  }
+  .matrix-value.zero {
+    color: #ccc;
+  }
 </style>
 </head>
 <body>
@@ -849,6 +880,11 @@
               <p class="loading">Lade Berichte...</p>
             </div>
           </div>
+        </div>
+        
+        <div class="chart-container" style="grid-column: span 2;">
+          <h3>🧩 Zeitmatrix: Mitarbeiter und Überkategorien</h3>
+          <div id="userLabelMatrixContainer" style="overflow-x: auto;"></div>
         </div>
         
       </div>
@@ -1316,6 +1352,7 @@
         createLabelChart(stats.label_stats);
         createCFDChart(stats.cfd_stats);
         createLabelTimelineChart(stats.label_timeline_stats);
+        createUserLabelMatrixTable(stats.user_label_matrix);
         createTreeDiagram(data, users);
         
       } catch (error) {
@@ -1451,6 +1488,7 @@
         createLabelChart(stats.label_stats);
         createCFDChart(stats.cfd_stats);
         createLabelTimelineChart(stats.label_timeline_stats);
+        createUserLabelMatrixTable(stats.user_label_matrix);
         createTreeDiagram(data, users);
         
       } catch (error) {
@@ -1965,6 +2003,47 @@ function toggleEpic(epicId) {
       }
     }
     
+    function createUserLabelMatrixTable(matrix) {
+      const container = document.getElementById('userLabelMatrixContainer');
+      if (!matrix || Object.keys(matrix).length === 0) {
+        container.innerHTML = '<p>Keine Daten verfügbar</p>';
+        return;
+      }
+
+      const users = Object.keys(matrix).sort();
+      // Get all unique labels from the first user (assuming all users have same labels keys)
+      const labels = Object.keys(matrix[users[0]] || {}).sort();
+
+      let html = '<table class="matrix-table">';
+      
+      // Header row
+      html += '<thead><tr><th>User</th>';
+      labels.forEach(label => {
+        html += `<th>${label}</th>`;
+      });
+      html += '<th>Gesamt</th></tr></thead>';
+      
+      // Body rows
+      html += '<tbody>';
+      users.forEach(user => {
+        let userTotal = 0;
+        html += `<tr><td style="font-weight:bold;">${user}</td>`;
+        
+        labels.forEach(label => {
+          const value = matrix[user][label] || 0;
+          userTotal += value;
+          const displayValue = value > 0 ? value.toFixed(2) + ' h' : '-';
+          const classNames = value === 0 ? 'matrix-value zero' : 'matrix-value';
+          html += `<td class="${classNames}">${displayValue}</td>`;
+        });
+        
+        html += `<td style="font-weight:bold;">${userTotal.toFixed(2)} h</td></tr>`;
+      });
+      html += '</tbody></table>';
+      
+      container.innerHTML = html;
+    }
+
     // Initialize and load data on page load
     initMode();
     loadData(currentFilter, false);
