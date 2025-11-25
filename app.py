@@ -954,16 +954,7 @@ def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_
 def generate_weekly_report():
     """Generate weekly project status report using OpenRouter API"""
     try:
-        # Check if data is loaded
-        if epic_tree is None:
-            # Try to load data first
-            try:
-                load_data(force_refresh=False)
-            except Exception as load_error:
-                return {
-                    'success': False,
-                    'error': f'Data not loaded and failed to load: {str(load_error)}'
-                }
+        load_data(force_refresh=True)
         
         # Ensure reports directory exists
         reports_dir = Path("reports")
