@@ -331,6 +331,14 @@ def get_data():
             user_total = sum(d['Zeitaufwand (h)'] * d.get(user, 0) for d in issues)
             user_stats[user] = round(user_total, 2)
         
+        label_stats = {}
+        for label in labels:
+            label_issues = [d for d in issues if d.get(label, False)]
+            label_stats[label] = {
+                'count': len(label_issues),
+                'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
+            }
+        
         # Calculate creation statistics
         target_matrix_labels = ["Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"]
         
