@@ -8,14 +8,14 @@ Ein interaktives Dashboard zur Visualisierung und Analyse von Zeiterfassungsdate
 
 - Python 3.8 oder höher
 - GitLab Account mit API-Zugriff
-- Personal Access Token mit `api` Scope
+- Personal Access Token mit `read-api` Scope
 - Gemini API KEY (optional)
 
 ## ⚙️ Konfiguration
 
 ### Schritt 1: `.env` Datei erstellen
 
-Erstellen Sie eine `.env` Datei im Projektverzeichnis:
+Erstellen Sie eine `.env` Datei im Projektverzeichnis (referenz: `.env.example`):
 
 ```env
 TOKEN=ihr_gitlab_personal_access_token
@@ -31,13 +31,9 @@ GEMINI_API_KEY=gemini-api-key
 2. Klicken Sie auf **"Add new token"**
 3. Geben Sie einen Namen ein (z.B. "Time Tracking Dashboard")
 4. Wählen Sie die **Scopes**:
-   - ✅ `api` (erforderlich für GraphQL-Zugriff)
-   - ✅ `read_api` (optional, aber empfohlen)
-5. Setzen Sie ein Ablaufdatum (optional)
-6. Klicken Sie auf **"Create personal access token"**
-7. **Kopieren Sie den Token** und fügen Sie ihn in die `.env` Datei ein
-
-⚠️ **Wichtig**: Der Token wird nur einmal angezeigt!
+   - ✅ `read_api`
+5. Klicken Sie auf **"Create personal access token"**
+6. **Kopieren Sie den Token** und fügen Sie ihn in die `.env` Datei ein
 
 ### Schritt 3: Gruppe und Epic konfigurieren
 
@@ -45,23 +41,11 @@ GEMINI_API_KEY=gemini-api-key
   - Beispiel: `my-organization/my-team`
   - Finden Sie diesen unter: GitLab → Ihre Gruppe → Einstellungen → Allgemein
   
-- **`EPIC_ROOT_ID`**: Die IID (nicht ID!) des Root-Epics
-  - Beispiel: `42`
-  - Finden Sie diese in der Epic-URL: `https://gitlab.com/groups/my-group/-/epics/42`
-  - Die Zahl nach `/epics/` ist die IID
+### Hardcode ändern
 
-### Projektstruktur
+- in `app.py` -> [324] target_matrix_labels = ["Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"]
 
-```bash
-gitlab_timeapp/
-├── app.py                 # Flask-Anwendung und API-Endpoints
-├── timetracker.py         # GitLab API-Integration und Datenverarbeitung
-├── Epic.py               # Epic-Datenmodell
-├── Issue.py              # Issue-Datenmodell mit Timelog-Funktionen
-├── Workitem.py           # Basis-Klasse für Epic und Issue
-├── templates/
-│   └── index.html        # Dashboard-Frontend mit Charts
-├── requirements.txt      # Python-Abhängigkeiten
-├── .env                  # Konfigurationsdatei (nicht im Git!)
-└── README.md            # Diese Datei
-```
+### Ideen
+
+- Rangliste (Leaderboard)
+- balken diagramm für die Überkategorien (vllt.)

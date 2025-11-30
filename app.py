@@ -1,6 +1,8 @@
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from dotenv import load_dotenv
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 from Epic import Epic
 from Issue import Issue
@@ -16,6 +18,19 @@ from google import genai
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configure logging
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240000, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('GitLab Time Tracking Dashboard startup')
 
 # Initialize scheduler for automated reports
 scheduler = BackgroundScheduler()
@@ -50,6 +65,7 @@ def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
     
     # Always reload if force_refresh is True
     if force_refresh or epic_tree is None:
+        app.logger.info(f"Loading data - force_refresh={force_refresh}, epic_tree={'None' if epic_tree is None else 'exists'}")
         print(f"🔄 Fetching fresh data from GitLab...")
         csv_rows = []
         users_set = set()
@@ -61,6 +77,7 @@ def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
         TOKEN = token if token is not None else os.getenv("TOKEN")
         
         if not GROUP_FULL_PATH or not EPIC_IID or not TOKEN:
+            app.logger.error("Missing required parameters for data loading")
             raise ValueError("Missing required parameters: TOKEN, GROUP_FULL_PATH, and EPIC_ROOT_ID")
         
         # Import users and labels from timetracker module
@@ -117,6 +134,7 @@ def load_data(force_refresh=False, token=None, group_path=None, epic_id=None):
                 build_rows(child)
         
         build_rows(epic_tree)
+        app.logger.info(f"Data loaded successfully: {len(csv_rows)} items, {len(users)} users, {len(labels)} labels")
         print(f"✅ Data loaded successfully: {len(csv_rows)} items, {len(users)} users, {len(labels)} labels")
         
     return csv_rows
@@ -252,6 +270,7 @@ def index():
 def get_data():
     """API endpoint to get all data with optional date filtering"""
     try:
+        app.logger.info(f"API /api/data called - args: {dict(request.args)}")
         days = request.args.get('days', None)
         days = int(days) if days else None
         start_date = request.args.get('start_date', None)
@@ -312,14 +331,6 @@ def get_data():
             user_total = sum(d['Zeitaufwand (h)'] * d.get(user, 0) for d in issues)
             user_stats[user] = round(user_total, 2)
         
-        label_stats = {}
-        for label in labels:
-            label_issues = [d for d in issues if d.get(label, False)]
-            label_stats[label] = {
-                'count': len(label_issues),
-                'hours': round(sum(d['Zeitaufwand (h)'] for d in label_issues), 2)
-            }
-        
         # Calculate creation statistics
         target_matrix_labels = ["Entwurf", "Implementation & Test", "Projektmanagement", "Requirements Engineering"]
         
@@ -371,6 +382,7 @@ def get_data():
         })
     except Exception as e:
         import traceback
+        app.logger.error(f"Error in /api/data: {str(e)}\n{traceback.format_exc()}")
         return jsonify({
             "success": False,
             "error": str(e),
@@ -990,7 +1002,7 @@ def calculate_user_label_matrix(issues, target_labels, users):
     return matrix
 
 def generate_weekly_report():
-    """Generate weekly project status report using OpenRouter API"""
+    """Generate weekly project status report using Google Gemini API"""
     try:
         load_data(force_refresh=True)
         
@@ -1009,8 +1021,7 @@ def generate_weekly_report():
         user_stats = {}
         for user in users:
             user_total = sum(d['Zeitaufwand (h)'] * d.get(user, 0) for d in issues)
-            if user_total > 0:
-                user_stats[user] = round(user_total, 2)
+            user_stats[user] = round(user_total, 2)
         
         label_stats = {}
         for label in labels:
@@ -1073,7 +1084,6 @@ def generate_weekly_report():
             'total_estimated': total_estimated,
             'progress_percentage': round((total_spent / total_estimated * 100) if total_estimated > 0 else 0, 1),
             'user_stats': user_stats,
-            'label_stats': label_stats,
             'user_label_matrix': user_label_matrix,
             'top_issues': [
                 {
@@ -1150,6 +1160,7 @@ Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(html_report)
         
+        app.logger.info(f"Weekly report generated successfully: {filename}")
         print(f"✅ Weekly report generated: {filename}")
         return {
             'success': True,
@@ -1159,6 +1170,7 @@ Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
         }
         
     except Exception as e:
+        app.logger.error(f"Error generating weekly report: {str(e)}\n{traceback.format_exc()}")
         print(f"❌ Error generating weekly report: {e}")
         import traceback
         traceback.print_exc()
@@ -1177,6 +1189,7 @@ def api_generate_report():
 def list_reports():
     """List all available reports"""
     try:
+        app.logger.info("API /api/reports called")
         reports_dir = Path("reports")
         if not reports_dir.exists():
             return jsonify({'success': True, 'reports': []})
@@ -1191,15 +1204,18 @@ def list_reports():
         
         return jsonify({'success': True, 'reports': reports})
     except Exception as e:
+        app.logger.error(f"Error listing reports: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route("/reports/<filename>")
 def serve_report(filename):
     """Serve a specific report file"""
     try:
+        app.logger.info(f"Serving report: {filename}")
         reports_dir = Path("reports")
         return send_from_directory(reports_dir, filename)
     except Exception as e:
+        app.logger.error(f"Error serving report {filename}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 404
 
 if __name__ == "__main__":
