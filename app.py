@@ -1148,11 +1148,15 @@ Verwende modernes CSS (inline) mit professionellem Design, Farben und guter Lesb
 Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
 
         # Generate content with Gemini
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt
-        )
-        html_report = response.text
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            html_report = response.text
+        except Exception as e:
+            app.logger.error(f"Error in AI response: {e}")
+
         
         # Clean up markdown code blocks if present
         if html_report.startswith('```html'):
@@ -1194,12 +1198,7 @@ def api_generate_report():
     try:
         result = generate_weekly_report()
     except Exception as e:
-        import traceback
-        app.logger.error(f"Error in /api/generate-report: {str(e)}\n{traceback.format_exc()}")
-        result = {
-            'success': False,
-            'error': str(e)
-        }
+        app.logger.error(f"Error in /api/generate-report: {e}")
     
     return jsonify(result)
 
