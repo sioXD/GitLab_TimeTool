@@ -1190,7 +1190,17 @@ Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
 @app.route("/api/generate-report", methods=['POST'])
 def api_generate_report():
     """API endpoint to manually trigger report generation"""
-    result = generate_weekly_report()
+    app.logger.info("API /api/generate-report called")
+    try:
+        result = generate_weekly_report()
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Error in /api/generate-report: {str(e)}\n{traceback.format_exc()}")
+        result = {
+            'success': False,
+            'error': str(e)
+        }
+    
     return jsonify(result)
 
 @app.route("/api/reports")
