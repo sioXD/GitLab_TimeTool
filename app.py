@@ -1153,12 +1153,13 @@ Gib NUR den HTML-Code zurück, ohne Markdown-Formatierung."""
                 model='gemini-2.5-flash',
                 contents=prompt
             )
-            app.logger.error(f"{response}")
+            app.logger.info(f"RESPONSE: {response}")
         except Exception as e:
             app.logger.error(f"Error in AI response: {e}")
 
         html_report = response.text
-        
+        app.logger.info(f"HTML REPORT: {html_report}")
+
         # Clean up markdown code blocks if present
         if html_report.startswith('```html'):
             html_report = html_report.replace('```html', '').replace('```', '').strip()
