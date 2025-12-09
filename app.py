@@ -574,52 +574,82 @@ def calculate_creation_stats_date_range(issues, start_date_str, end_date_str):
     return result
 
 def calculate_cfd_stats_date_range(issues, start_date_str, end_date_str):
-    """Calculate CFD statistics for specific date range"""
+    """Calculate CFD statistics for specific date range based on actual work dates"""
+    from collections import defaultdict
+    
     start_date = datetime.fromisoformat(start_date_str).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.now().astimezone().tzinfo)
     end_date = datetime.fromisoformat(end_date_str).replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=datetime.now().astimezone().tzinfo)
     
+    # Track which issues had work on which days
+    issue_work_dates = defaultdict(set)  # issue_id -> set of dates with work
+    issue_status = {}  # issue_id -> current status
+    
+    if epic_tree:
+        def process_issue(e):
+            if e.type == "issue":
+                issue_id = e.id
+                state = e.state if hasattr(e, 'state') else 'opened'
+                issue_status[issue_id] = state
+                
+                if hasattr(e, 'userTimeMap'):
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                
+                                if start_date <= entry_date <= end_date:
+                                    issue_work_dates[issue_id].add(entry_date.strftime('%Y-%m-%d'))
+                            except:
+                                continue
+            
+            for child in e.children:
+                process_issue(child)
+        
+        process_issue(epic_tree)
+    
+    # Build daily status counts
     daily_status = {}
     day = start_date
     
     while day <= end_date:
         day_label = day.strftime('%Y-%m-%d')
         
+        # Track which issues we've seen on or before this day
+        issues_seen = set()
         todo_count = 0
         in_progress_count = 0
         done_count = 0
         
-        for issue in issues:
-            created_at = issue.get('createdAt')
-            state = issue.get('state', 'opened')
-            time_spent = issue.get('Zeitaufwand (h)', 0)
+        for issue_id, work_dates in issue_work_dates.items():
+            # Check if this issue has any work up to this day
+            has_work_until_today = any(d <= day_label for d in work_dates)
             
-            if not created_at:
-                continue
-            
-            try:
-                if created_at.endswith('Z'):
-                    created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                elif '+' in created_at or created_at.count('-') > 2:
-                    created_date = datetime.fromisoformat(created_at)
-                else:
-                    created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            if has_work_until_today:
+                issues_seen.add(issue_id)
+                state = issue_status.get(issue_id, 'opened')
                 
-                if created_date.date() <= day.date():
-                    if state == 'closed':
-                        done_count += 1
-                    elif time_spent > 0:
-                        in_progress_count += 1
-                    else:
-                        todo_count += 1
-                    
-            except Exception as ex:
-                continue
+                # Check if work was done on this specific day
+                work_on_this_day = day_label in work_dates
+                
+                if state == 'closed':
+                    done_count += 1
+                elif work_on_this_day or any(d <= day_label for d in work_dates):
+                    # If work was done on this day or before, it's in progress
+                    in_progress_count += 1
+                else:
+                    todo_count += 1
         
         daily_status[day_label] = {
             'todo': todo_count,
             'in_progress': in_progress_count,
             'done': done_count,
-            'total': todo_count + in_progress_count + done_count
+            'total': len(issues_seen)
         }
         
         day += timedelta(days=1)
@@ -708,87 +738,114 @@ def calculate_creation_stats(issues, days=None):
     return result
 
 def calculate_cfd_stats(issues, days=None):
-    """Calculate Cumulative Flow Diagram data - issues by status over time"""
+    """Calculate Cumulative Flow Diagram data - issues by status over time based on actual work dates"""
+    from collections import defaultdict
     
+    # Determine date range
     if days is None:
-        # Use all data, find the earliest issue
-        cutoff_date = None
+        # Find earliest date from time entries
         all_dates = []
-        for issue in issues:
-            created_at = issue.get('createdAt')
-            if created_at:
-                try:
-                    if created_at.endswith('Z'):
-                        created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    elif '+' in created_at or created_at.count('-') > 2:
-                        created_date = datetime.fromisoformat(created_at)
-                    else:
-                        created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
-                    all_dates.append(created_date)
-                except:
-                    pass
+        if epic_tree:
+            def collect_dates(e):
+                if e.type == "issue" and hasattr(e, 'userTimeMap'):
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                all_dates.append(entry_date)
+                            except:
+                                pass
+                for child in e.children:
+                    collect_dates(child)
+            collect_dates(epic_tree)
         
         if all_dates:
-            cutoff_date = min(all_dates)
+            cutoff_date = min(all_dates).replace(hour=0, minute=0, second=0, microsecond=0)
         else:
             cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=30)
+            cutoff_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
     else:
         cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
+        cutoff_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # Create daily timeline
-    current_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = datetime.now(datetime.now().astimezone().tzinfo).replace(hour=23, minute=59, second=59)
     
-    daily_status = {}
+    # Track which issues had work on which days
+    issue_work_dates = defaultdict(set)  # issue_id -> set of dates with work
+    issue_status = {}  # issue_id -> current status
     
-    # Calculate status counts per day
-    day = current_date
+    if epic_tree:
+        def process_issue(e):
+            if e.type == "issue":
+                issue_id = e.id
+                state = e.state if hasattr(e, 'state') else 'opened'
+                issue_status[issue_id] = state
+                
+                if hasattr(e, 'userTimeMap'):
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                
+                                if cutoff_date <= entry_date <= end_date:
+                                    issue_work_dates[issue_id].add(entry_date.strftime('%Y-%m-%d'))
+                            except:
+                                continue
+            
+            for child in e.children:
+                process_issue(child)
+        
+        process_issue(epic_tree)
+    
+    # Build daily status counts
+    daily_status = {}
+    day = cutoff_date
     
     while day <= end_date:
         day_label = day.strftime('%Y-%m-%d')
         
-        # Count issues by status on this day
+        # Track which issues we've seen on or before this day
+        issues_seen = set()
         todo_count = 0
         in_progress_count = 0
         done_count = 0
         
-        for issue in issues:
-            created_at = issue.get('createdAt')
-            state = issue.get('state', 'opened')
-            time_spent = issue.get('Zeitaufwand (h)', 0)
+        for issue_id, work_dates in issue_work_dates.items():
+            # Check if this issue has any work up to this day
+            has_work_until_today = any(d <= day_label for d in work_dates)
             
-            if not created_at:
-                continue
-            
-            try:
-                # Parse created date
-                if created_at.endswith('Z'):
-                    created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                elif '+' in created_at or created_at.count('-') > 2:
-                    created_date = datetime.fromisoformat(created_at)
-                else:
-                    created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
+            if has_work_until_today:
+                issues_seen.add(issue_id)
+                state = issue_status.get(issue_id, 'opened')
                 
-                # Only count issues that were created before or on this day
-                if created_date.date() <= day.date():
-                    # Classify issue status
-                    if state == 'closed':
-                        done_count += 1
-                    elif time_spent > 0:
-                        # If time was spent, consider it in progress
-                        in_progress_count += 1
-                    else:
-                        # No time spent and not closed = to do
-                        todo_count += 1
-                    
-            except Exception as ex:
-                continue
+                # Check if work was done on this specific day
+                work_on_this_day = day_label in work_dates
+                
+                if state == 'closed':
+                    done_count += 1
+                elif work_on_this_day or any(d <= day_label for d in work_dates):
+                    # If work was done on this day or before, it's in progress
+                    in_progress_count += 1
+                else:
+                    todo_count += 1
         
         daily_status[day_label] = {
             'todo': todo_count,
             'in_progress': in_progress_count,
             'done': done_count,
-            'total': todo_count + in_progress_count + done_count
+            'total': len(issues_seen)
         }
         
         day += timedelta(days=1)
@@ -807,33 +864,42 @@ def calculate_cfd_stats(issues, days=None):
     return result
 
 def calculate_label_timeline_stats(issues, target_labels, days=None):
-    """Calculate timeline statistics for specific labels"""
+    """Calculate timeline statistics for specific labels based on actual time logging dates"""
     from collections import defaultdict
     
     if days is None:
-        # Use all data, find the earliest issue
         cutoff_date = None
+    else:
+        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
+    
+    # Get date range from epic_tree time entries
+    if cutoff_date is None:
+        # Find earliest time entry
         all_dates = []
-        for issue in issues:
-            created_at = issue.get('createdAt')
-            if created_at:
-                try:
-                    if created_at.endswith('Z'):
-                        created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    elif '+' in created_at or created_at.count('-') > 2:
-                        created_date = datetime.fromisoformat(created_at)
-                    else:
-                        created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
-                    all_dates.append(created_date)
-                except:
-                    pass
+        if epic_tree:
+            def collect_dates(e):
+                if e.type == "issue" and hasattr(e, 'userTimeMap'):
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                all_dates.append(entry_date)
+                            except:
+                                pass
+                for child in e.children:
+                    collect_dates(child)
+            collect_dates(epic_tree)
         
         if all_dates:
             cutoff_date = min(all_dates)
         else:
             cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=30)
-    else:
-        cutoff_date = datetime.now(datetime.now().astimezone().tzinfo) - timedelta(days=days)
     
     # Create daily timeline
     current_date = cutoff_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -841,43 +907,44 @@ def calculate_label_timeline_stats(issues, target_labels, days=None):
     
     daily_label_hours = defaultdict(lambda: {label: 0 for label in target_labels})
     
-    # Iterate through each issue and accumulate time spent per label per day
-    for issue in issues:
-        created_at = issue.get('createdAt')
-        if not created_at:
-            continue
+    # Iterate through epic_tree and accumulate time based on actual logging dates
+    if epic_tree:
+        def process_issue(e):
+            if e.type == "issue":
+                # Check which labels this issue has
+                issue_labels = [label for label in target_labels if e.hasLabel(label)]
+                
+                if issue_labels and hasattr(e, 'userTimeMap'):
+                    # Process each time entry
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                
+                                if entry_date.tzinfo is None:
+                                    entry_date = entry_date.replace(tzinfo=current_date.tzinfo)
+                                
+                                # Check if this entry is in our date range
+                                if current_date <= entry_date <= end_date:
+                                    day_label = entry_date.strftime('%Y-%m-%d')
+                                    time_hours = entry['Zeit(Std)']
+                                    time_per_label = time_hours / len(issue_labels)
+                                    
+                                    for label in issue_labels:
+                                        daily_label_hours[day_label][label] += time_per_label
+                            except Exception as ex:
+                                continue
+            
+            for child in e.children:
+                process_issue(child)
         
-        try:
-            # Parse created date
-            if created_at.endswith('Z'):
-                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            elif '+' in created_at or created_at.count('-') > 2:
-                created_date = datetime.fromisoformat(created_at)
-            else:
-                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
-            
-            # Check which labels this issue has
-            issue_labels = [label for label in target_labels if issue.get(label, False)]
-            
-            if not issue_labels:
-                continue
-            
-            # Get total time spent on this issue
-            time_spent = issue.get('Zeitaufwand (h)', 0)
-            
-            if time_spent > 0:
-                # Distribute time equally among the issue's matching labels
-                time_per_label = time_spent / len(issue_labels)
-                
-                # Assign this time to the creation date
-                day_label = created_date.strftime('%Y-%m-%d')
-                
-                if created_date >= current_date and created_date <= end_date:
-                    for label in issue_labels:
-                        daily_label_hours[day_label][label] += time_per_label
-                    
-        except Exception as ex:
-            continue
+        process_issue(epic_tree)
     
     # Create cumulative timeline
     day = current_date
@@ -905,7 +972,7 @@ def calculate_label_timeline_stats(issues, target_labels, days=None):
     return result
 
 def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_str, end_date_str):
-    """Calculate timeline statistics for specific labels in a date range"""
+    """Calculate timeline statistics for specific labels in a date range based on actual time logging dates"""
     from collections import defaultdict
     
     start_date = datetime.fromisoformat(start_date_str).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.now().astimezone().tzinfo)
@@ -913,43 +980,44 @@ def calculate_label_timeline_stats_date_range(issues, target_labels, start_date_
     
     daily_label_hours = defaultdict(lambda: {label: 0 for label in target_labels})
     
-    # Iterate through each issue and accumulate time spent per label per day
-    for issue in issues:
-        created_at = issue.get('createdAt')
-        if not created_at:
-            continue
+    # Iterate through epic_tree and accumulate time based on actual logging dates
+    if epic_tree:
+        def process_issue(e):
+            if e.type == "issue":
+                # Check which labels this issue has
+                issue_labels = [label for label in target_labels if e.hasLabel(label)]
+                
+                if issue_labels and hasattr(e, 'userTimeMap'):
+                    # Process each time entry
+                    for user, time_entries in e.userTimeMap.items():
+                        for entry in time_entries:
+                            try:
+                                date_str = entry['Datum']
+                                if date_str.endswith('Z'):
+                                    entry_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                elif '+' in date_str or date_str.count('-') > 2:
+                                    entry_date = datetime.fromisoformat(date_str)
+                                else:
+                                    entry_date = datetime.fromisoformat(date_str).replace(tzinfo=datetime.now().astimezone().tzinfo)
+                                
+                                if entry_date.tzinfo is None:
+                                    entry_date = entry_date.replace(tzinfo=start_date.tzinfo)
+                                
+                                # Check if this entry is in our date range
+                                if start_date <= entry_date <= end_date:
+                                    day_label = entry_date.strftime('%Y-%m-%d')
+                                    time_hours = entry['Zeit(Std)']
+                                    time_per_label = time_hours / len(issue_labels)
+                                    
+                                    for label in issue_labels:
+                                        daily_label_hours[day_label][label] += time_per_label
+                            except Exception as ex:
+                                continue
+            
+            for child in e.children:
+                process_issue(child)
         
-        try:
-            # Parse created date
-            if created_at.endswith('Z'):
-                created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            elif '+' in created_at or created_at.count('-') > 2:
-                created_date = datetime.fromisoformat(created_at)
-            else:
-                created_date = datetime.fromisoformat(created_at).replace(tzinfo=datetime.now().astimezone().tzinfo)
-            
-            # Check which labels this issue has
-            issue_labels = [label for label in target_labels if issue.get(label, False)]
-            
-            if not issue_labels:
-                continue
-            
-            # Get total time spent on this issue
-            time_spent = issue.get('Zeitaufwand (h)', 0)
-            
-            if time_spent > 0:
-                # Distribute time equally among the issue's matching labels
-                time_per_label = time_spent / len(issue_labels)
-                
-                # Assign this time to the creation date
-                day_label = created_date.strftime('%Y-%m-%d')
-                
-                if created_date >= start_date and created_date <= end_date:
-                    for label in issue_labels:
-                        daily_label_hours[day_label][label] += time_per_label
-                    
-        except Exception as ex:
-            continue
+        process_issue(epic_tree)
     
     # Create cumulative timeline
     day = start_date
